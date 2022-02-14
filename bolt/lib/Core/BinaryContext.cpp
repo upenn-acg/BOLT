@@ -622,6 +622,7 @@ bool BinaryContext::analyzeJumpTable(const uint64_t Address,
 }
 
 void BinaryContext::populateJumpTables() {
+	
   LLVM_DEBUG(dbgs() << "DataPCRelocations: " << DataPCRelocations.size()
                     << '\n');
   for (auto JTI = JumpTables.begin(), JTE = JumpTables.end(); JTI != JTE;
@@ -683,6 +684,7 @@ void BinaryContext::populateJumpTables() {
     assert(0 && "unclaimed PC-relative relocations left in data\n");
   }
   clearList(DataPCRelocations);
+	
 }
 
 void BinaryContext::skipMarkedFragments() {
