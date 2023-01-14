@@ -107,6 +107,12 @@ WriteAutoFDOData("autofdo",
   cl::ZeroOrMore,
   cl::cat(AggregatorCategory));
 
+static cl::opt<bool>
+ContinuousOpt("cont-opt",
+  cl::desc("to support Ocolos's continuous optimization"),
+  cl::init(false),
+  cl::cat(AggregatorCategory));
+
 } // namespace opts
 
 namespace {
@@ -1907,44 +1913,124 @@ DataAggregator::parseMMapEvent() {
 
   // Line:
   //   PERF_RECORD_MMAP2 <pid>/<tid>: [<hexbase>(<hexsize>) .*]: .* <file_name>
-
   StringRef FileName = Line.rsplit(FieldSeparator).second;
-  if (FileName.startswith("//") || FileName.startswith("[")) {
+
+  // zyuxuan: add code to handle C1 mysqld.bolt LBR samples
+  if (!opts::ContinuousOpt){
+    if (FileName.startswith("//") || FileName.startswith("[")) {
+      consumeRestOfLine();
+      return std::make_pair(StringRef(), ParsedInfo);
+    }
+    FileName = sys::path::filename(FileName);
+
+    const StringRef PIDStr = Line.split(FieldSeparator).second.split('/').first;
+    if (PIDStr.getAsInteger(10, ParsedInfo.PID)) {
+      reportError("expected PID");
+      Diag << "Found: " << PIDStr << "in '" << Line << "'\n";
+      return make_error_code(llvm::errc::io_error);
+    }
+
+    const StringRef BaseAddressStr = Line.split('[').second.split('(').first;
+    if (BaseAddressStr.getAsInteger(0, ParsedInfo.BaseAddress)) {
+      reportError("expected base address");
+      Diag << "Found: " << BaseAddressStr << "in '" << Line << "'\n";
+      return make_error_code(llvm::errc::io_error);
+    }
+
+    const StringRef SizeStr = Line.split('(').second.split(')').first;
+    if (SizeStr.getAsInteger(0, ParsedInfo.Size)) {
+      reportError("expected mmaped size");
+      Diag << "Found: " << SizeStr << "in '" << Line << "'\n";
+      return make_error_code(llvm::errc::io_error);
+    }
+
+    const StringRef OffsetStr =
+        Line.split('@').second.ltrim().split(FieldSeparator).first;
+    if (OffsetStr.getAsInteger(0, ParsedInfo.Offset)) {
+      reportError("expected mmaped page-aligned offset");
+      Diag << "Found: " << OffsetStr << "in '" << Line << "'\n";
+      return make_error_code(llvm::errc::io_error);
+    }
+
     consumeRestOfLine();
-    return std::make_pair(StringRef(), ParsedInfo);
   }
-  FileName = sys::path::filename(FileName);
+  else{
+    if (FileName.startswith("[")) {
+      consumeRestOfLine();
+      return std::make_pair(StringRef(), ParsedInfo);
+    }
+    else if (FileName.startswith("//")){
+      FileName = sys::path::filename(StringRef("/home/zyuxuan/ocolos_data/mysqld.bolt"));
 
-  const StringRef PIDStr = Line.split(FieldSeparator).second.split('/').first;
-  if (PIDStr.getAsInteger(10, ParsedInfo.PID)) {
-    reportError("expected PID");
-    Diag << "Found: " << PIDStr << "in '" << Line << "'\n";
-    return make_error_code(llvm::errc::io_error);
+      const StringRef PIDStr = Line.split(FieldSeparator).second.split('/').first;
+      if (PIDStr.getAsInteger(10, ParsedInfo.PID)) {
+        reportError("expected PID");
+        Diag << "Found: " << PIDStr << "in '" << Line << "'\n";
+        return make_error_code(llvm::errc::io_error);
+      }
+
+      const StringRef BaseAddressStr = Line.split('[').second.split('(').first;
+      if (BaseAddressStr.getAsInteger(0, ParsedInfo.BaseAddress)) {
+        reportError("expected base address");
+        Diag << "Found: " << BaseAddressStr << "in '" << Line << "'\n";
+        return make_error_code(llvm::errc::io_error);
+      }
+
+      const StringRef SizeStr = Line.split('(').second.split(')').first;
+      if (SizeStr.getAsInteger(0, ParsedInfo.Size)) {
+        reportError("expected mmaped size");
+        Diag << "Found: " << SizeStr << "in '" << Line << "'\n";
+        return make_error_code(llvm::errc::io_error);
+      }
+
+      const StringRef OffsetStr = StringRef("0x4200000");
+      //const StringRef OffsetStr =
+      //    Line.split('@').second.ltrim().split(FieldSeparator).first;
+      if (OffsetStr.getAsInteger(0, ParsedInfo.Offset)) {
+        reportError("expected mmaped page-aligned offset");
+        Diag << "Found: " << OffsetStr << "in '" << Line << "'\n";
+        return make_error_code(llvm::errc::io_error);
+      }
+
+      consumeRestOfLine();
+    }
+    else {
+      FileName = sys::path::filename(FileName);
+      if (FileName.compare(StringRef("mysqld"))==0){
+         FileName = StringRef("mysqld.bolt");
+      }
+      const StringRef PIDStr = Line.split(FieldSeparator).second.split('/').first;
+      if (PIDStr.getAsInteger(10, ParsedInfo.PID)) {
+        reportError("expected PID");
+        Diag << "Found: " << PIDStr << "in '" << Line << "'\n";
+        return make_error_code(llvm::errc::io_error);
+      }
+
+      const StringRef BaseAddressStr = Line.split('[').second.split('(').first;
+      if (BaseAddressStr.getAsInteger(0, ParsedInfo.BaseAddress)) {
+        reportError("expected base address");
+        Diag << "Found: " << BaseAddressStr << "in '" << Line << "'\n";
+        return make_error_code(llvm::errc::io_error);
+      }
+
+      const StringRef SizeStr = Line.split('(').second.split(')').first;
+      if (SizeStr.getAsInteger(0, ParsedInfo.Size)) {
+        reportError("expected mmaped size");
+        Diag << "Found: " << SizeStr << "in '" << Line << "'\n";
+        return make_error_code(llvm::errc::io_error);
+      }
+
+      const StringRef OffsetStr =
+          Line.split('@').second.ltrim().split(FieldSeparator).first;
+      if (OffsetStr.getAsInteger(0, ParsedInfo.Offset)) {
+        reportError("expected mmaped page-aligned offset");
+        Diag << "Found: " << OffsetStr << "in '" << Line << "'\n";
+        return make_error_code(llvm::errc::io_error);
+      }
+
+      consumeRestOfLine();
+    }
   }
-
-  const StringRef BaseAddressStr = Line.split('[').second.split('(').first;
-  if (BaseAddressStr.getAsInteger(0, ParsedInfo.BaseAddress)) {
-    reportError("expected base address");
-    Diag << "Found: " << BaseAddressStr << "in '" << Line << "'\n";
-    return make_error_code(llvm::errc::io_error);
-  }
-
-  const StringRef SizeStr = Line.split('(').second.split(')').first;
-  if (SizeStr.getAsInteger(0, ParsedInfo.Size)) {
-    reportError("expected mmaped size");
-    Diag << "Found: " << SizeStr << "in '" << Line << "'\n";
-    return make_error_code(llvm::errc::io_error);
-  }
-
-  const StringRef OffsetStr =
-      Line.split('@').second.ltrim().split(FieldSeparator).first;
-  if (OffsetStr.getAsInteger(0, ParsedInfo.Offset)) {
-    reportError("expected mmaped page-aligned offset");
-    Diag << "Found: " << OffsetStr << "in '" << Line << "'\n";
-    return make_error_code(llvm::errc::io_error);
-  }
-
-  consumeRestOfLine();
 
   return std::make_pair(FileName, ParsedInfo);
 }
