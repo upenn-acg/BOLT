@@ -434,7 +434,7 @@ public:
                                    uint32_t Type);
 
   /// Code for ELF notes written by producer 'BOLT'
-  enum { NT_BOLT_BAT = 1, NT_BOLT_INSTRUMENTATION_TABLES = 2 };
+  enum { NT_BOLT_BAT = 1, NT_BOLT_INSTRUMENTATION_TABLES = 2, NT_BOLT_FUNC_MAP_TABLE = 3 };
 };
 
 inline uint8_t *copyByteArray(const uint8_t *Data, uint64_t Size) {
