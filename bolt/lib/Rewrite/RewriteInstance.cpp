@@ -5117,7 +5117,7 @@ void RewriteInstance::rewriteFile() {
 
   // Add BOLT Addresses Translation maps to allow profile collection to
   // happen in the output binary
-  if (opts::FuncMapTable){
+  if (opts::EnableBAT){
     addBATSection();
     if (opts::FuncMapTable){
       addFuncMapTableSection();
