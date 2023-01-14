@@ -17,6 +17,7 @@ namespace llvm {
 namespace bolt {
 
 const char *BoltAddressTranslation::SECTION_NAME = ".note.bolt_bat";
+const char *BoltAddressTranslation::SECTION_NAME_FUNC_MAP_TABLE = ".note.func_map_table";
 
 void BoltAddressTranslation::writeEntriesForBB(MapTy &Map,
                                                const BinaryBasicBlock &BB,
@@ -124,6 +125,41 @@ void BoltAddressTranslation::write(raw_ostream &OS) {
   outs() << "BOLT-INFO: Wrote " << NumColdEntries
          << " BAT cold-to-hot entries\n";
 }
+
+
+void BoltAddressTranslation::writeFuncMapTable(const BinaryContext &BC, raw_ostream &OS) {
+  LLVM_DEBUG(dbgs() << "BOLT-DEBUG: Writing reversed BOLT Address Translation Tables\n");
+
+  for (auto &BFI : BC.getBinaryFunctions()) {
+    const BinaryFunction &Function = BFI.second;
+    // We don't need a translation table if the body of the function hasn't
+    // changed
+    if (Function.isIgnored() || (!BC.HasRelocations && !Function.isSimple()))
+      continue;
+
+    LLVM_DEBUG(dbgs() << "Function name: " << Function.getPrintName() << "\n");
+    LLVM_DEBUG(dbgs() << " Address reference: 0x"
+                      << Twine::utohexstr(Function.getOutputAddress()) << "\n");
+
+    if (Function.getOutputAddress()/*BOLTed address*/ 
+        != Function.getAddress() /*original address*/){
+      FuncMapTable.insert(std::pair<uint64_t, uint64_t>(Function.getOutputAddress(), Function.getAddress() ));
+    }
+  }
+
+  const uint64_t NumEntries = FuncMapTable.size();
+  OS.write(reinterpret_cast<const char *>(&NumEntries), 8);
+  LLVM_DEBUG(dbgs() << "Writing " << NumEntries << " functions for reversed BAT.\n");
+
+  for (std::pair<const uint64_t, uint64_t> KeyVal : FuncMapTable) {
+    OS.write(reinterpret_cast<const char *>(&KeyVal.first), 8);
+    OS.write(reinterpret_cast<const char *>(&KeyVal.second), 8);
+  }
+
+  outs() << "BOLT-INFO: Wrote " << NumEntries << " Function Map Table entries\n";
+}
+
+
 
 std::error_code BoltAddressTranslation::parse(StringRef Buf) {
   DataExtractor DE = DataExtractor(Buf, true, 8);
