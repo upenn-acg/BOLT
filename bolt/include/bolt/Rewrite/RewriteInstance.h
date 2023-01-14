@@ -308,6 +308,7 @@ private:
   /// maps that can be used to enable sampling of the output binary for the
   /// purpose of generating BOLT profile data for the input binary.
   void addBATSection();
+  void addFuncMapTableSection();
 
   /// Loop over now emitted functions to write translation maps
   void encodeBATSection();

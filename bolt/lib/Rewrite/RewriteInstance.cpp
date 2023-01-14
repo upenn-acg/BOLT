@@ -3977,6 +3977,15 @@ void RewriteInstance::addBATSection() {
                                   /*IsReadOnly=*/true, ELF::SHT_NOTE);
 }
 
+
+void RewriteInstance::addFuncMapTableSection() {
+  BC->registerOrUpdateNoteSection(BoltAddressTranslation::SECTION_NAME_FUNC_MAP_TABLE, nullptr,
+                                  0,
+                                  /*Alignment=*/1,
+                                  /*IsReadOnly=*/true, ELF::SHT_NOTE);
+}
+
+
 void RewriteInstance::encodeBATSection() {
   std::string DescStr;
   raw_string_ostream DescOS(DescStr);
@@ -4448,6 +4457,11 @@ void RewriteInstance::updateELFSymbolTable(
         NewSymbol.st_value = Function->getOutputAddress();
         NewSymbol.st_size = Function->getOutputSize();
         NewSymbol.st_shndx = Function->getCodeSection()->getIndex();
+        char orig[33], bolt[33];
+        sprintf(orig, "%lx", Function->getAddress());
+        sprintf(bolt, "%lx", Function->getOutputAddress());
+        outs()<<"@@@@ "<<*Function;
+        outs()<<" "<<orig<<" "<<bolt<<" "<<Function->getSize()<<" "<<Function->getOutputSize()<<"\n";
       } else if (Symbol.st_shndx < ELF::SHN_LORESERVE) {
         NewSymbol.st_shndx = getNewSectionIndex(Symbol.st_shndx);
       }

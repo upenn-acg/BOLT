@@ -75,12 +75,14 @@ public:
   /// Name of the ELF section where the table will be serialized to in the
   /// output binary
   static const char *SECTION_NAME;
+  static const char *SECTION_NAME_FUNC_MAP_TABLE;
 
   BoltAddressTranslation(BinaryContext &BC) : BC(BC) {}
 
   /// Write the serialized address translation tables for each reordered
   /// function
   void write(raw_ostream &OS);
+  void writeFuncMapTable(const BinaryContext &BC, raw_ostream &OS);
 
   /// Read the serialized address translation tables and load them internally
   /// in memory. Return a parse error if failed.
@@ -118,6 +120,8 @@ private:
   BinaryContext &BC;
 
   std::map<uint64_t, MapTy> Maps;
+  HashMapTy64 ReversedMap;
+  HashMapTy64 FuncMapTable;
 
   /// Links outlined cold bocks to their original function
   std::map<uint64_t, uint64_t> ColdPartSource;
