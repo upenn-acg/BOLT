@@ -1391,7 +1391,9 @@ std::error_code DataAggregator::parseBranchEvents() {
 
   // first run readFuncMapTableSections() to 
   // update BAT's FuncMapTable
-  readFuncMapTableSections(BC);
+  if (opts::ContinuousOpt){
+    readFuncMapTableSections(BC);
+  }
 
   uint64_t NumTotalSamples = 0;
   uint64_t NumEntries = 0;
