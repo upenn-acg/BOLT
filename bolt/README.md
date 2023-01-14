@@ -49,11 +49,11 @@ The following instructions are assuming that you are running under Linux.
 Start with cloning LLVM and BOLT repos:
 
 ```
-> git clone https://github.com/facebookincubator/BOLT llvm-bolt
+> git clone git@github.com:upenn-acg/BOLT.git llvm-bolt
 > mkdir build
 > cd build
-> cmake -G Ninja ../llvm-bolt/llvm -DLLVM_TARGETS_TO_BUILD="X86;AArch64" -DCMAKE_BUILD_TYPE=Release -DLLVM_ENABLE_ASSERTIONS=ON -DLLVM_ENABLE_PROJECTS="clang;lld;bolt"
-> ninja
+> cmake -G "Unix Makefiles" ../llvm-bolt/llvm -DLLVM_TARGETS_TO_BUILD="X86;AArch64" -DCMAKE_BUILD_TYPE=Release -DLLVM_ENABLE_ASSERTIONS=ON -DLLVM_ENABLE_PROJECTS="clang;lld;bolt"
+> make -j
 ```
 
 `llvm-bolt` will be available under `bin/`. Add this directory to your path to
