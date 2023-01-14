@@ -311,6 +311,7 @@ private:
 
   /// Loop over now emitted functions to write translation maps
   void encodeBATSection();
+  void encodeFuncMapTableSection();
 
   /// Update the ELF note section containing the binary build-id to reflect
   /// a new build-id, so tools can differentiate between the old and the
