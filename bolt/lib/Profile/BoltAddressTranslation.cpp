@@ -229,6 +229,52 @@ std::error_code BoltAddressTranslation::parse(StringRef Buf) {
   return std::error_code();
 }
 
+
+std::error_code BoltAddressTranslation::parseFuncMapTable(StringRef Buf) {
+  DataExtractor DE = DataExtractor(Buf, true, 8);
+  uint64_t Offset = 0;
+  if (Buf.size() < 12)
+    return make_error_code(llvm::errc::io_error);
+
+  const uint32_t NameSz = DE.getU32(&Offset);
+  const uint32_t DescSz = DE.getU32(&Offset);
+  const uint32_t Type = DE.getU32(&Offset);
+
+  if (Type != BinarySection::NT_BOLT_FUNC_MAP_TABLE ||
+      Buf.size() + Offset < alignTo(NameSz, 4) + DescSz)
+    return make_error_code(llvm::errc::io_error);
+
+  StringRef Name = Buf.slice(Offset, Offset + NameSz);
+  Offset = alignTo(Offset + NameSz, 4);
+  if (Name.substr(0, 4) != "BOLT")
+    return make_error_code(llvm::errc::io_error);
+
+  if (Buf.size() - Offset < 8)
+    return make_error_code(llvm::errc::io_error);
+
+  const uint64_t NumEntries = DE.getU64(&Offset);
+  LLVM_DEBUG(dbgs() << "Parsing " << NumEntries << " functions\n");
+
+  //MapTy Map;
+
+  for (uint64_t J = 0; J < NumEntries; ++J) {
+    const uint64_t OutputAddr = DE.getU64(&Offset);
+    const uint64_t InputAddr = DE.getU64(&Offset);
+    FuncMapTable.insert(std::pair<uint64_t, uint64_t>(OutputAddr, InputAddr));
+    LLVM_DEBUG(dbgs() << Twine::utohexstr(OutputAddr) << " -> "
+                      << Twine::utohexstr(InputAddr) << "\n");
+    //zyuxuan: debug usage
+    outs() << Twine::utohexstr(OutputAddr) << " -> "
+           << Twine::utohexstr(InputAddr) << "\n";
+  }
+
+
+  outs() << "BOLT-INFO: Parsed " << FuncMapTable.size() << " Function Map Table entries\n";
+
+  return std::error_code();
+}
+
+
 uint64_t BoltAddressTranslation::translate(const BinaryFunction &Func,
                                            uint64_t Offset,
                                            bool IsBranchSrc) const {

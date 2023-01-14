@@ -88,6 +88,7 @@ public:
   /// Read the serialized address translation tables and load them internally
   /// in memory. Return a parse error if failed.
   std::error_code parse(StringRef Buf);
+  std::error_code parseFuncMapTable(StringRef Buf);
 
   /// If the maps are loaded in memory, perform the lookup to translate LBR
   /// addresses in \p Func.
