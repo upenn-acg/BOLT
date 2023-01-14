@@ -4002,7 +4002,7 @@ void RewriteInstance::encodeBATSection() {
 }
 
 
-ewriteInstance::encodeFuncMapTableSection() {
+void RewriteInstance::encodeFuncMapTableSection() {
   std::string DescStr;
   raw_string_ostream DescOS(DescStr);
 
@@ -5117,7 +5117,7 @@ void RewriteInstance::rewriteFile() {
 
   // Add BOLT Addresses Translation maps to allow profile collection to
   // happen in the output binary
-  if (opts::){
+  if (opts::FuncMapTable){
     addBATSection();
     if (opts::FuncMapTable){
       addFuncMapTableSection();
