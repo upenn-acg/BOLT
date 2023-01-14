@@ -652,6 +652,28 @@ void DataAggregator::processProfile(BinaryContext &BC) {
   clear(MemSamples);
 }
 
+
+// zyuxuan
+// add function to get reversed BAT from BOLTed binary's note section 
+void DataAggregator::readFuncMapTableSections(const BinaryContext* BC){
+  ErrorOr<BinarySection &> FuncMapTableSec = 
+     BC->getUniqueSectionByName(BoltAddressTranslation::SECTION_NAME_FUNC_MAP_TABLE);
+  if (FuncMapTableSec){
+    if (!opts::HeatmapMode) {
+      if (std::error_code EC = BAT->parseFuncMapTable(FuncMapTableSec->getContents())) {
+        errs() << "BOLT-ERROR: failed to parse Function Map Table.\n";
+        exit(1);
+      }
+    }    
+  }
+  else{
+    errs()<<"BOLT-ERROR: Function Map Table doesn't exists.\n";
+  }
+}
+
+
+
+
 BinaryFunction *
 DataAggregator::getBinaryFunctionContainingAddress(uint64_t Address) const {
   if (!BC->containsAddress(Address))
@@ -1366,6 +1388,10 @@ std::error_code DataAggregator::parseBranchEvents() {
   outs() << "PERF2BOLT: parse branch events...\n";
   NamedRegionTimer T("parseBranch", "Parsing branch events", TimerGroupName,
                      TimerGroupDesc, opts::TimeAggregator);
+
+  // first run readFuncMapTableSections() to 
+  // update BAT's FuncMapTable
+  readFuncMapTableSections(BC);
 
   uint64_t NumTotalSamples = 0;
   uint64_t NumEntries = 0;

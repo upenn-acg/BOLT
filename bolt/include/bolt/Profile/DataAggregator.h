@@ -76,6 +76,9 @@ public:
   /// Check whether \p FileName is a perf.data file
   static bool checkPerfDataMagic(StringRef FileName);
 
+  /// zyuxuan: add function to get the reversed BAT section
+  void readFuncMapTableSections(const BinaryContext* BC); 
+
 private:
   struct PerfBranchSample {
     SmallVector<LBREntry, 32> LBR;
