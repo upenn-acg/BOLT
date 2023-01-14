@@ -306,6 +306,12 @@ WriteBoltInfoSection("bolt-info",
   cl::Hidden,
   cl::cat(BoltOutputCategory));
 
+static cl::opt<bool>
+FuncMapTable("enable-func-map-table",
+  cl::desc("to support Ocolos's continuous optimization"),
+  cl::init(false),
+  cl::cat(AggregatorCategory));
+
 } // namespace opts
 
 constexpr const char *RewriteInstance::SectionsToOverwrite[];
@@ -3986,6 +3992,22 @@ void RewriteInstance::encodeBATSection() {
                                   /*IsReadOnly=*/true, ELF::SHT_NOTE);
 }
 
+
+ewriteInstance::encodeFuncMapTableSection() {
+  std::string DescStr;
+  raw_string_ostream DescOS(DescStr);
+
+  BAT->writeFuncMapTable(*BC, DescOS);
+  DescOS.flush();
+
+  const std::string BoltInfo =
+      BinarySection::encodeELFNote("BOLT", DescStr, BinarySection::NT_BOLT_FUNC_MAP_TABLE);
+  BC->registerOrUpdateNoteSection(BoltAddressTranslation::SECTION_NAME_FUNC_MAP_TABLE,
+                                  copyByteArray(BoltInfo), BoltInfo.size(),
+                                  /*Alignment=*/1,
+                                  /*IsReadOnly=*/true, ELF::SHT_NOTE);
+}
+
 template <typename ELFObjType, typename ELFShdrTy>
 std::string RewriteInstance::getOutputSectionName(const ELFObjType &Obj,
                                                   const ELFShdrTy &Section) {
@@ -5081,8 +5103,12 @@ void RewriteInstance::rewriteFile() {
 
   // Add BOLT Addresses Translation maps to allow profile collection to
   // happen in the output binary
-  if (opts::EnableBAT)
+  if (opts::){
     addBATSection();
+    if (opts::FuncMapTable){
+      addFuncMapTableSection();
+    }
+  }
 
   // Patch program header table.
   patchELFPHDRTable();
@@ -5095,8 +5121,12 @@ void RewriteInstance::rewriteFile() {
 
   patchBuildID();
 
-  if (opts::EnableBAT)
+  if (opts::EnableBAT){
     encodeBATSection();
+    if (opts::FuncMapTable){
+      encodeFuncMapTableSection();
+    }
+  }
 
   // Copy non-allocatable sections once allocatable part is finished.
   rewriteNoteSections();
