@@ -14,6 +14,7 @@
 #include "llvm/ADT/StringRef.h"
 #include <cstdint>
 #include <map>
+#include <unordered_map>
 #include <system_error>
 
 namespace llvm {
@@ -68,7 +69,7 @@ class BoltAddressTranslation {
 public:
   // In-memory representation of the address translation table
   using MapTy = std::map<uint32_t, uint32_t>;
-
+  using HashMapTy64 = std::unordered_map<uint64_t, uint64_t>;
   // List of taken fall-throughs
   using FallthroughListTy = SmallVector<std::pair<uint64_t, uint64_t>, 16>;
 
