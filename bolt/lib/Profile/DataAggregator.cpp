@@ -1063,6 +1063,18 @@ ErrorOr<LBREntry> DataAggregator::parseLBREntry() {
     Diag << "Found: " << Rest.get() << "\n";
     return make_error_code(llvm::errc::io_error);
   }
+
+  // zyuxuan: update the address by looking up the 
+  // corresponding BOLTed address in the reversed BAT
+  if (opts::ContinuousOpt){
+    if (BAT->lookupReversedMap(Res.From)){
+      Res.From = BAT->ReversedMapTranslate(Res.From);
+    } 
+    if (BAT->lookupReversedMap(Res.To)){
+      Res.To = BAT->ReversedMapTranslate(Res.To);
+    } 
+  }
+
   return Res;
 }
 
