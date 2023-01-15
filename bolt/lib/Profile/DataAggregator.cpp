@@ -655,7 +655,7 @@ void DataAggregator::processProfile(BinaryContext &BC) {
 
 // zyuxuan
 // add function to get reversed BAT from BOLTed binary's note section 
-void DataAggregator::readFuncMapTableSections(const BinaryContext* BC){
+void DataAggregator::readFuncMapTableSection(const BinaryContext* BC){
   ErrorOr<BinarySection &> FuncMapTableSec = 
      BC->getUniqueSectionByName(BoltAddressTranslation::SECTION_NAME_FUNC_MAP_TABLE);
   if (FuncMapTableSec){
@@ -671,6 +671,19 @@ void DataAggregator::readFuncMapTableSections(const BinaryContext* BC){
   }
 }
 
+
+void DataAggregator::readBATSection(const BinaryContext* BC){
+  if (ErrorOr<BinarySection &> BATSec =
+          BC->getUniqueSectionByName(BoltAddressTranslation::SECTION_NAME)) {
+    // Do not read BAT when plotting a heatmap
+    if (!opts::HeatmapMode) {
+      if (std::error_code EC = BAT->parse(BATSec->getContents())) {
+        errs() << "BOLT-ERROR: failed to parse BOLT address translation table.\n";
+        exit(1);
+      }
+    }
+  }
+}
 
 
 
@@ -1393,6 +1406,7 @@ std::error_code DataAggregator::parseBranchEvents() {
   // update BAT's FuncMapTable
   if (opts::ContinuousOpt){
     readFuncMapTableSections(BC);
+    readBATSection(BC);
   }
 
   uint64_t NumTotalSamples = 0;
