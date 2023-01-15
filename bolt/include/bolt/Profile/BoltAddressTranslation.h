@@ -111,6 +111,9 @@ public:
   /// addresses when aggregating profile
   bool enabledFor(llvm::object::ELFObjectFileBase *InputFile) const;
 
+  /// zyuxuan: update reversed BAT
+  void updateReversedBAT();
+
 private:
   /// Helper to update \p Map by inserting one or more BAT entries reflecting
   /// \p BB for function located at \p FuncAddress. At least one entry will be

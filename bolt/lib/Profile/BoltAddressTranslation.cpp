@@ -371,5 +371,13 @@ bool BoltAddressTranslation::enabledFor(
   }
   return false;
 }
+
+
+void BoltAddressTranslation::updateReversedBAT(){
+  for (auto map: Maps){
+    
+  }
+}
+
 } // namespace bolt
 } // namespace llvm
