@@ -389,6 +389,7 @@ void BoltAddressTranslation::updateReversedBAT(){
       ReversedMap.insert(std::make_pair(inputAddr, outputAddr)); 
     }
   }
+  outs()<<"BOLT-INFO: "<<ReversedMap.size()<<" entries of Reversed BAT are filled into Reversed Map\n";
 }
 
 } // namespace bolt
