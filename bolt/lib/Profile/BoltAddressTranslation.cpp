@@ -374,19 +374,19 @@ bool BoltAddressTranslation::enabledFor(
 
 
 void BoltAddressTranslation::updateReversedBAT(){
-  for (auto map: Maps){
+  for (auto it =  Maps.begin(); it!=Maps.end(); it++){
     uint64_t originalAddress;
-    uint64_t BOLTedAddress = map->first;
-    if (FuncMapTable.find(map->first)!=FuncMapTable.end()){
-      originalAddress = FuncMapTable[map->first];
+    uint64_t BOLTedAddress = it->first;
+    if (FuncMapTable.find(it->first)!=FuncMapTable.end()){
+      originalAddress = FuncMapTable[it->first];
     }
     else{
-      originalAddress = map->first;
+      originalAddress = it->first;
     }
-    for (auto entry: map){
+    for (auto entry= it->second.begin(); entry!=it->second.end(); entry++){
       uint64_t inputAddr = entry->second + originalAddress;
       uint64_t outputAddr = entry->first + BOLTedAddress;
-      ReversedBAT.insert(std::make_pair(inputAddress, outputAddress)); 
+      ReversedMap.insert(std::make_pair(inputAddr, outputAddr)); 
     }
   }
 }
