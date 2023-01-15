@@ -114,6 +114,13 @@ public:
   /// zyuxuan: update reversed BAT
   void updateReversedBAT();
 
+  bool lookupReversedMap(uint64_t Address){
+    if (ReversedMap.find(Address) != ReversedMap.end()) return true; 
+    else return false;
+  }
+
+  uint64_t ReversedMapTranslate(uint64_t Address){return ReversedMap[Address];}
+
 private:
   /// Helper to update \p Map by inserting one or more BAT entries reflecting
   /// \p BB for function located at \p FuncAddress. At least one entry will be
