@@ -1407,6 +1407,7 @@ std::error_code DataAggregator::parseBranchEvents() {
   if (opts::ContinuousOpt){
     readFuncMapTableSection(BC);
     readBATSection(BC);
+    BAT->updateReversedBAT();
   }
 
   uint64_t NumTotalSamples = 0;
