@@ -78,6 +78,7 @@ public:
 
   /// zyuxuan: add function to get the reversed BAT section
   void readFuncMapTableSections(const BinaryContext* BC); 
+  void readBATSection(const BinaryContext* BC);
 
 private:
   struct PerfBranchSample {
