@@ -77,7 +77,7 @@ public:
   static bool checkPerfDataMagic(StringRef FileName);
 
   /// zyuxuan: add function to get the reversed BAT section
-  void readFuncMapTableSections(const BinaryContext* BC); 
+  void readFuncMapTableSection(const BinaryContext* BC); 
   void readBATSection(const BinaryContext* BC);
 
 private:
