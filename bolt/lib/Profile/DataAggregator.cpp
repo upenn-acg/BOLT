@@ -1067,7 +1067,17 @@ ErrorOr<LBREntry> DataAggregator::parseLBREntry() {
   // zyuxuan: update the address by looking up the 
   // corresponding BOLTed address in the reversed BAT
   // needs to be changed
-  if (opts::ContinuousOpt){
+  if (opts::ContinuousOpt && BAT){
+    if (BAT->isAddressFromTheHoleOfBOLTedFunction(Res.From)){
+      uint64_t origStartingAddr = BAT->getOrigStartingAddr(Res.From);
+      uint64_t offset = Res.From - origStartingAddr;
+      BAT->translateToBOLTedAddr(origStartingAddr, offset, true);
+    }
+    if (BAT->isAddressFromTheHoleOfBOLTedFunction(Res.To)){
+      uint64_t origStartingAddr = BAT->getOrigStartingAddr(Res.To);
+      uint64_t offset = Res.To - origStartingAddr;
+      BAT->translateToBOLTedAddr(origStartingAddr, offset, false);
+    }
   }
 
   return Res;
@@ -1411,9 +1421,10 @@ std::error_code DataAggregator::parseBranchEvents() {
 
   // first run readFuncMapTableSections() to 
   // update BAT's FuncMapTable
-  if (opts::ContinuousOpt){
-    readFuncMapTableSection(BC);
+  if (opts::ContinuousOpt && BAT){
     readBATSection(BC);
+    readFuncMapTableSection(BC);
+    BAT->constructReversedMaps();
   }
 
   uint64_t NumTotalSamples = 0;

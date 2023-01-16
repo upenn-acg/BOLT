@@ -145,7 +145,7 @@ void BoltAddressTranslation::writeFuncMapTable(const BinaryContext &BC, raw_ostr
         != Function.getAddress() /*original address*/){
       std::vector<uint64_t> vec = {Function.getAddress(), Function.getSize()};
       FuncMapTables.insert(std::pair<uint64_t, std::vector<uint64_t>>(Function.getOutputAddress(),vec));
-      FuncMapTable.insert(std::pair<uint64_t, uint64_t>(Function.getOutputAddress(), Function.getAddress() ));
+      //FuncMapTable.insert(std::pair<uint64_t, uint64_t>(Function.getOutputAddress(), Function.getAddress() ));
     }
   }
 
@@ -266,7 +266,8 @@ std::error_code BoltAddressTranslation::parseFuncMapTable(StringRef Buf) {
     std::vector<uint64_t> vec = {InputAddr, InputSize};
     FuncMapTables.insert(std::pair<uint64_t, std::vector<uint64_t> >(OutputAddr, vec));
     OriginalFuncTable.insert(std::pair<uint64_t, uint64_t>(InputAddr + InputSize, InputAddr));
-    FuncMapTable.insert(std::pair<uint64_t, uint64_t>(OutputAddr, InputAddr));
+    Orig2BoltedMapTable.insert(std::pair<uint64_t, uint64_t>(InputAddr, OutputAddr));
+    Bolted2OrigMapTable.insert(std::pair<uint64_t, uint64_t>(OutputAddr, InputAddr));
     LLVM_DEBUG(dbgs() << Twine::utohexstr(OutputAddr) << " -> "
                       << Twine::utohexstr(InputAddr) << "\n");
     //zyuxuan: debug usage
@@ -281,15 +282,31 @@ std::error_code BoltAddressTranslation::parseFuncMapTable(StringRef Buf) {
 }
 
 
+void BoltAddressTranslation::constructReversedMaps(){
+  for (auto it = Maps.begin(); it!=Maps.end(); it++){
+    uint64_t BOLTedStartingAddr = it->first;
+    uint64_t OrigStartingAddr = it->first;
+    if (Bolted2OrigMapTable.find(BOLTedStartingAddr)!=Bolted2OrigMapTable.end()){
+      OrigStartingAddr = Bolted2OrigMapTable[BOLTedStartingAddr];  
+    }
+    MapTy offsetMap;
+    for (auto it2 = it->second.begin(); it2 != it->second.end(); it2++){
+      offsetMap.insert(std::pair<uint64_t, uint64_t> (it2->second, it2->first));
+    }
+    ReversedMaps.insert(std::pair<uint64_t, MapTy>(OrigStartingAddr, offsetMap));
+  }  
+}
+
+
 bool BoltAddressTranslation::isAddressFromTheHoleOfBOLTedFunction(uint64_t Address){
   auto it = OriginalFuncTable.lower_bound(Address);
   if (it->second <= Address) return true;
   else return false;
 }
 
-uint64_t getBoltedStartingAddr(uint64_t Address){
-  
-  return 0;  
+uint64_t BoltAddressTranslation::getOrigStartingAddr(uint64_t Address){
+  uint64_t OriginalStartingAddr = OriginalFuncTable.lower_bound(Address)->second;
+  return OriginalStartingAddr;
 }
 
 
@@ -317,31 +334,10 @@ uint64_t BoltAddressTranslation::translate(const BinaryFunction &Func,
 }
 
 
-uint64_t BoltAddressTranslation::translateToAddr(uint64_t BOLTedAddress,
+uint64_t BoltAddressTranslation::translateToBOLTedAddr(uint64_t BOLTedAddress,
                                            uint64_t Offset,
                                            bool IsBranchSrc) {
-  uint64_t originalStartingAddr = BOLTedAddress;
-  if (FuncMapTable.find(BOLTedAddress)!=FuncMapTable.end()){
-    originalStartingAddr = FuncMapTable[BOLTedAddress];
-  }
-  auto Iter = Maps.find(BOLTedAddress);
-  if (Iter == Maps.end())
-    return Offset + originalStartingAddr;
-
-  const MapTy &Map = Iter->second;
-  auto KeyVal = Map.upper_bound(Offset);
-  if (KeyVal == Map.begin())
-    return Offset + originalStartingAddr;
-
-  --KeyVal;
-
-  const uint32_t Val = KeyVal->second & ~BRANCHENTRY;
-  // Branch source addresses are translated to the first instruction of the
-  // source BB to avoid accounting for modifications BOLT may have made in the
-  // BB regarding deletion/addition of instructions.
-  if (IsBranchSrc)
-    return Val + originalStartingAddr;
-  return Offset - KeyVal->first + Val + originalStartingAddr;
+  return 0;
 }
 
 
