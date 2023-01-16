@@ -91,13 +91,14 @@ public:
   /// in memory. Return a parse error if failed.
   std::error_code parse(StringRef Buf);
   std::error_code parseFuncMapTable(StringRef Buf);
+  void constructReversedMaps();
 
   /// If the maps are loaded in memory, perform the lookup to translate LBR
   /// addresses in \p Func.
   uint64_t translate(const BinaryFunction &Func, uint64_t Offset,
                      bool IsBranchSrc) const;
-  uint64_t translateToAddr(uint64_t BOLTedAddress, uint64_t Offset, bool IsBranchSrc);
-  uint64_t getBoltedStartingAddr(uint64_t Address);
+  uint64_t translateToBOLTedAddr(uint64_t BOLTedAddress, uint64_t Offset, bool IsBranchSrc);
+  uint64_t getOrigStartingAddr(uint64_t Address);
   /// Use the map keys containing basic block addresses to infer fall-throughs
   /// taken in the path started at FirstLBR.To and ending at SecondLBR.From.
   /// Return NoneType if trace is invalid or the list of fall-throughs
@@ -125,11 +126,18 @@ private:
                          uint64_t FuncAddress);
 
   BinaryContext &BC;
-
+  
+  // BOLTed Func Starting addr -> [BOLTed Offset -> Original Offset]
   std::map<uint64_t, MapTy> Maps;
-  HashMapTy64 ReversedMap;
-  HashMapTy64 FuncMapTable;
+  // Original Func Starting addr -> [Original Offset -> BOLTed Offset] 
+  std::map<uint64_t, MapTy> ReversedMaps;
+  // Original -> BOLTed starting address
+  HashMapTy64 Orig2BoltedMapTable;
+  // BOLTed -> Original starting address
+  HashMapTy64 Bolted2OrigMapTable;
+  // Original Func Ending Addr -> Original Func Starting Addr
   MapTy64 OriginalFuncTable;
+  // BOLTed Func Starting Addr -> <Original Func Starting Addr, Original Func Ending Addr>
   std::map<uint64_t, std::vector<uint64_t>> FuncMapTables;
 
   /// Links outlined cold bocks to their original function
