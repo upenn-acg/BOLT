@@ -1071,12 +1071,12 @@ ErrorOr<LBREntry> DataAggregator::parseLBREntry() {
     if (BAT->isAddressFromTheHoleOfBOLTedFunction(Res.From)){
       uint64_t origStartingAddr = BAT->getOrigStartingAddr(Res.From);
       uint64_t offset = Res.From - origStartingAddr;
-      BAT->translateToBOLTedAddr(origStartingAddr, offset, true);
+      Res.From = BAT->translateToBOLTedAddr(origStartingAddr, offset, true);
     }
     if (BAT->isAddressFromTheHoleOfBOLTedFunction(Res.To)){
       uint64_t origStartingAddr = BAT->getOrigStartingAddr(Res.To);
       uint64_t offset = Res.To - origStartingAddr;
-      BAT->translateToBOLTedAddr(origStartingAddr, offset, false);
+      Res.To = BAT->translateToBOLTedAddr(origStartingAddr, offset, false);
     }
   }
 
