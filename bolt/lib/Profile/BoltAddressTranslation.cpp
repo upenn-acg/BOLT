@@ -334,10 +334,27 @@ uint64_t BoltAddressTranslation::translate(const BinaryFunction &Func,
 }
 
 
-uint64_t BoltAddressTranslation::translateToBOLTedAddr(uint64_t BOLTedAddress,
-                                           uint64_t Offset,
+uint64_t BoltAddressTranslation::translateToBOLTedAddr(uint64_t origStartingAddr,
+                                           uint64_t origOffset,
                                            bool IsBranchSrc) {
-  return 0;
+  uint64_t BOLTedStartingAddr = origStartingAddr;
+  if (Orig2BoltedMapTable.find(origStartingAddr)!=Orig2BoltedMapTable.end()){
+    BOLTedStartingAddr = Orig2BoltedMapTable[origStartingAddr];
+  }
+
+  auto Iter = ReversedMaps.find(origStartingAddr);
+  if (Iter == ReversedMaps.end())
+    return origOffset + BOLTedStartingAddr;
+
+  const MapTy map = Iter->second;
+  auto KeyVal = map.upper_bound(origOffset);
+  if (KeyVal == map.begin())
+    return origOffset + BOLTedStartingAddr;
+
+  const uint64_t Val = KeyVal->second & ~BRANCHENTRY;
+  if (IsBranchSrc)
+    return Val + BOLTedStartingAddr;
+  return origOffset - KeyVal-> first + Val + BOLTedStartingAddr;
 }
 
 
