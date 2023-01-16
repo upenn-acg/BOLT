@@ -1066,13 +1066,8 @@ ErrorOr<LBREntry> DataAggregator::parseLBREntry() {
 
   // zyuxuan: update the address by looking up the 
   // corresponding BOLTed address in the reversed BAT
+  // needs to be changed
   if (opts::ContinuousOpt){
-    if (BAT->lookupReversedMap(Res.From)){
-      Res.From = BAT->ReversedMapTranslate(Res.From);
-    } 
-    if (BAT->lookupReversedMap(Res.To)){
-      Res.To = BAT->ReversedMapTranslate(Res.To);
-    } 
   }
 
   return Res;
@@ -1419,7 +1414,6 @@ std::error_code DataAggregator::parseBranchEvents() {
   if (opts::ContinuousOpt){
     readFuncMapTableSection(BC);
     readBATSection(BC);
-    BAT->updateReversedBAT();
   }
 
   uint64_t NumTotalSamples = 0;
@@ -1489,6 +1483,13 @@ std::error_code DataAggregator::parseBranchEvents() {
                        << Twine::utohexstr(TraceFrom - TraceBF->getAddress())
                        << " and ending @ " << Twine::utohexstr(TraceTo)
                        << '\n');
+
+            outs()     << "Invalid trace starting in "
+                       << TraceBF->getPrintName() << " @ "
+                       << Twine::utohexstr(TraceFrom)
+                       << " and ending @ " << Twine::utohexstr(TraceTo)
+                       << '\n';
+
             ++NumInvalidTraces;
           } else {
             LLVM_DEBUG(dbgs()
@@ -1584,7 +1585,7 @@ std::error_code DataAggregator::parseBranchEvents() {
   }
   outs() << "\n";
   if (Perc > 10.0f)
-    outs() << "\n !! WARNING !! This high mismatch ratio indicates the input "
+    outs() << "\n !! WARNING(parseBranchEvents) !! This high mismatch ratio indicates the input "
               "binary is probably not the same binary used during profiling "
               "collection. The generated data may be ineffective for improving "
               "performance.\n\n";
@@ -1698,7 +1699,7 @@ void DataAggregator::processBasicEvents() {
   }
   outs() << "\n";
   if (Perc > 80.0f)
-    outs() << "\n !! WARNING !! This high mismatch ratio indicates the input "
+    outs() << "\n !! WARNING(processBasicEvents) !! This high mismatch ratio indicates the input "
               "binary is probably not the same binary used during profiling "
               "collection. The generated data may be ineffective for improving "
               "performance.\n\n";
@@ -1834,7 +1835,7 @@ void DataAggregator::processPreAggregated() {
   }
   outs() << "\n";
   if (Perc > 10.0f)
-    outs() << "\n !! WARNING !! This high mismatch ratio indicates the input "
+    outs() << "\n !! WARNING (processPreAggregated) !! This high mismatch ratio indicates the input "
               "binary is probably not the same binary used during profiling "
               "collection. The generated data may be ineffective for improving "
               "performance.\n\n";

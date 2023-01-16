@@ -14,6 +14,7 @@
 #include "llvm/ADT/StringRef.h"
 #include <cstdint>
 #include <map>
+#include <vector>
 #include <unordered_map>
 #include <system_error>
 
@@ -69,6 +70,7 @@ class BoltAddressTranslation {
 public:
   // In-memory representation of the address translation table
   using MapTy = std::map<uint32_t, uint32_t>;
+  using MapTy64 = std::map<uint64_t, uint64_t>;
   using HashMapTy64 = std::unordered_map<uint64_t, uint64_t>;
   // List of taken fall-throughs
   using FallthroughListTy = SmallVector<std::pair<uint64_t, uint64_t>, 16>;
@@ -94,7 +96,8 @@ public:
   /// addresses in \p Func.
   uint64_t translate(const BinaryFunction &Func, uint64_t Offset,
                      bool IsBranchSrc) const;
-
+  uint64_t translateToAddr(uint64_t BOLTedAddress, uint64_t Offset, bool IsBranchSrc);
+  uint64_t getBoltedStartingAddr(uint64_t Address);
   /// Use the map keys containing basic block addresses to infer fall-throughs
   /// taken in the path started at FirstLBR.To and ending at SecondLBR.From.
   /// Return NoneType if trace is invalid or the list of fall-throughs
@@ -111,16 +114,8 @@ public:
   /// addresses when aggregating profile
   bool enabledFor(llvm::object::ELFObjectFileBase *InputFile) const;
 
-  /// zyuxuan: update reversed BAT
-  void updateReversedBAT();
-
-  bool lookupReversedMap(uint64_t Address){
-    if (ReversedMap.find(Address) != ReversedMap.end()) return true; 
-    else return false;
-  }
-
-  uint64_t ReversedMapTranslate(uint64_t Address){return ReversedMap[Address];}
-
+  /// zyuxuan: this can only be coalled when in the continuous opt setting
+  bool isAddressFromTheHoleOfBOLTedFunction(uint64_t Address);
 private:
   /// Helper to update \p Map by inserting one or more BAT entries reflecting
   /// \p BB for function located at \p FuncAddress. At least one entry will be
@@ -134,6 +129,8 @@ private:
   std::map<uint64_t, MapTy> Maps;
   HashMapTy64 ReversedMap;
   HashMapTy64 FuncMapTable;
+  MapTy64 OriginalFuncTable;
+  std::map<uint64_t, std::vector<uint64_t>> FuncMapTables;
 
   /// Links outlined cold bocks to their original function
   std::map<uint64_t, uint64_t> ColdPartSource;
