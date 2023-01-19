@@ -310,7 +310,13 @@ static cl::opt<bool>
 FuncMapTable("enable-func-map-table",
   cl::desc("to support Ocolos's continuous optimization"),
   cl::init(false),
-  cl::cat(AggregatorCategory));
+  cl::cat(BoltOutputCategory));
+
+static cl::opt<bool>
+ForOcolos("enable-ocolos",
+  cl::desc("to support first version of ocolos"),
+  cl::init(false),
+  cl::cat(BoltOutputCategory));
 
 } // namespace opts
 
@@ -4457,11 +4463,13 @@ void RewriteInstance::updateELFSymbolTable(
         NewSymbol.st_value = Function->getOutputAddress();
         NewSymbol.st_size = Function->getOutputSize();
         NewSymbol.st_shndx = Function->getCodeSection()->getIndex();
-        char orig[33], bolt[33];
-        sprintf(orig, "%lx", Function->getAddress());
-        sprintf(bolt, "%lx", Function->getOutputAddress());
-        outs()<<"@@@@ "<<*Function;
-        outs()<<" "<<orig<<" "<<bolt<<" "<<Function->getSize()<<" "<<Function->getOutputSize()<<"\n";
+        if (opts::ForOcolos){
+          char orig[33], bolt[33];
+          sprintf(orig, "%lx", Function->getAddress());
+          sprintf(bolt, "%lx", Function->getOutputAddress());
+          outs()<<"@@@@ "<<*Function;
+          outs()<<" "<<orig<<" "<<bolt<<" "<<Function->getSize()<<" "<<Function->getOutputSize()<<"\n";
+        }
       } else if (Symbol.st_shndx < ELF::SHN_LORESERVE) {
         NewSymbol.st_shndx = getNewSectionIndex(Symbol.st_shndx);
       }
