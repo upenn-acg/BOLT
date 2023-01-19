@@ -1067,16 +1067,21 @@ ErrorOr<LBREntry> DataAggregator::parseLBREntry() {
   // zyuxuan: update the address by looking up the 
   // corresponding BOLTed address in the reversed BAT
   // needs to be changed
+
   if (opts::ContinuousOpt && BAT){
-    if (BAT->isAddressFromTheHoleOfBOLTedFunction(Res.From)){
-      uint64_t origStartingAddr = BAT->getOrigStartingAddr(Res.From);
-      uint64_t offset = Res.From - origStartingAddr;
-      Res.From = BAT->translateToBOLTedAddr(origStartingAddr, offset, true);
+    if (Res.From < 0x4400000){
+      if (BAT->isAddressFromTheHoleOfBOLTedFunction(Res.From)){
+         uint64_t origStartingAddr = BAT->getOrigStartingAddr(Res.From);
+         uint64_t offset = Res.From - origStartingAddr;
+         Res.From = BAT->translateToBOLTedAddr(origStartingAddr, offset, true);
+      }
     }
-    if (BAT->isAddressFromTheHoleOfBOLTedFunction(Res.To)){
-      uint64_t origStartingAddr = BAT->getOrigStartingAddr(Res.To);
-      uint64_t offset = Res.To - origStartingAddr;
-      Res.To = BAT->translateToBOLTedAddr(origStartingAddr, offset, false);
+    if (Res.To < 0x4400000){
+      if (BAT->isAddressFromTheHoleOfBOLTedFunction(Res.To)){
+         uint64_t origStartingAddr = BAT->getOrigStartingAddr(Res.To);
+         uint64_t offset = Res.To - origStartingAddr;
+         Res.To = BAT->translateToBOLTedAddr(origStartingAddr, offset, false);
+      }
     }
   }
 
@@ -1494,13 +1499,13 @@ std::error_code DataAggregator::parseBranchEvents() {
                        << Twine::utohexstr(TraceFrom - TraceBF->getAddress())
                        << " and ending @ " << Twine::utohexstr(TraceTo)
                        << '\n');
-
+/*
             outs()     << "Invalid trace starting in "
                        << TraceBF->getPrintName() << " @ "
                        << Twine::utohexstr(TraceFrom)
                        << " and ending @ " << Twine::utohexstr(TraceTo)
                        << '\n';
-
+*/
             ++NumInvalidTraces;
           } else {
             LLVM_DEBUG(dbgs()

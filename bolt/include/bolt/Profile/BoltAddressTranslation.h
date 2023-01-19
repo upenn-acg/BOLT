@@ -97,7 +97,7 @@ public:
   /// addresses in \p Func.
   uint64_t translate(const BinaryFunction &Func, uint64_t Offset,
                      bool IsBranchSrc) const;
-  uint64_t translateToBOLTedAddr(uint64_t BOLTedAddress, uint64_t Offset, bool IsBranchSrc);
+  uint64_t translateToBOLTedAddr(uint64_t originalStartingAddress, uint64_t originalOffset, bool IsBranchSrc);
   uint64_t getOrigStartingAddr(uint64_t Address);
   /// Use the map keys containing basic block addresses to infer fall-throughs
   /// taken in the path started at FirstLBR.To and ending at SecondLBR.From.
@@ -130,7 +130,7 @@ private:
   // BOLTed Func Starting addr -> [BOLTed Offset -> Original Offset]
   std::map<uint64_t, MapTy> Maps;
   // Original Func Starting addr -> [Original Offset -> BOLTed Offset] 
-  std::map<uint64_t, MapTy> ReversedMaps;
+  std::unordered_map<uint64_t, MapTy> ReversedMaps;
   // Original -> BOLTed starting address
   HashMapTy64 Orig2BoltedMapTable;
   // BOLTed -> Original starting address
