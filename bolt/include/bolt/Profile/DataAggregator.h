@@ -19,6 +19,7 @@
 #include "llvm/Support/Error.h"
 #include "llvm/Support/Program.h"
 #include <unordered_map>
+#include <unordered_set>
 
 namespace llvm {
 namespace bolt {
@@ -80,7 +81,33 @@ public:
   void readFuncMapTableSection(const BinaryContext* BC); 
   void readBATSection(const BinaryContext* BC);
 
+  /// zyuxuan: things related to update AddressCache
+  bool IllegalAddressCacheContainsAddress(uint64_t address){
+    if (IllegalAddressCache.find(address)!=IllegalAddressCache.end()) return true; 
+    else return false;
+  } 
+
+  bool LegalAddressCacheContainsAddress(uint64_t address){
+    if (LegalAddressCache.find(address)!=LegalAddressCache.end()) return true;
+    else return false;
+  }
+
+  void insertNewAddressPair(uint64_t originalAddress, uint64_t BOLTedAddress){
+    IllegalAddressCache.insert(std::pair<uint64_t, uint64_t>(originalAddress, BOLTedAddress)); 
+  }
+
+  void insertNewAddress(uint64_t address){
+    LegalAddressCache.insert(address); 
+  }
+
+  uint64_t getBOLTedAddress(uint64_t originalAddress){
+    return IllegalAddressCache[originalAddress]; 
+  }
+
 private:
+  std::unordered_map<uint64_t, uint64_t> IllegalAddressCache;
+  std::unordered_set<uint64_t> LegalAddressCache;
+
   struct PerfBranchSample {
     SmallVector<LBREntry, 32> LBR;
     uint64_t PC;
