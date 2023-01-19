@@ -1070,17 +1070,35 @@ ErrorOr<LBREntry> DataAggregator::parseLBREntry() {
 
   if (opts::ContinuousOpt && BAT){
     if (Res.From < 0x4400000){
-      if (BAT->isAddressFromTheHoleOfBOLTedFunction(Res.From)){
-         uint64_t origStartingAddr = BAT->getOrigStartingAddr(Res.From);
-         uint64_t offset = Res.From - origStartingAddr;
-         Res.From = BAT->translateToBOLTedAddr(origStartingAddr, offset, true);
+      if (IllegalAddressCacheContainsAddress(Res.From)){
+        Res.From = getBOLTedAddress(Res.From);
+      }
+      else if (!LegalAddressCacheContainsAddress(Res.From)){
+        if (BAT->isAddressFromTheHoleOfBOLTedFunction(Res.From)){
+          uint64_t origStartingAddr = BAT->getOrigStartingAddr(Res.From);
+          uint64_t offset = Res.From - origStartingAddr;
+          Res.From = BAT->translateToBOLTedAddr(origStartingAddr, offset, true);
+          insertNewAddressPair(origStartingAddr + offset, Res.From);
+        }
+        else{
+          insertNewAddress(Res.From);
+        }
       }
     }
     if (Res.To < 0x4400000){
-      if (BAT->isAddressFromTheHoleOfBOLTedFunction(Res.To)){
-         uint64_t origStartingAddr = BAT->getOrigStartingAddr(Res.To);
-         uint64_t offset = Res.To - origStartingAddr;
-         Res.To = BAT->translateToBOLTedAddr(origStartingAddr, offset, false);
+      if (IllegalAddressCacheContainsAddress(Res.To)){
+        Res.To = getBOLTedAddress(Res.To);
+      }
+      else if (!LegalAddressCacheContainsAddress(Res.To)){
+        if (BAT->isAddressFromTheHoleOfBOLTedFunction(Res.To)){
+          uint64_t origStartingAddr = BAT->getOrigStartingAddr(Res.To);
+          uint64_t offset = Res.To - origStartingAddr;
+          Res.To = BAT->translateToBOLTedAddr(origStartingAddr, offset, false);
+          insertNewAddressPair(origStartingAddr + offset, Res.To);
+        }
+        else {
+          insertNewAddress(Res.To);
+        }
       }
     }
   }
