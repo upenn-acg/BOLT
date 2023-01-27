@@ -1069,7 +1069,7 @@ ErrorOr<LBREntry> DataAggregator::parseLBREntry() {
   // needs to be changed
 
   if (opts::ContinuousOpt && BAT){
-    if (Res.From < 0x4400000)
+    if (Res.From < 0x4400000){
       if (IllegalAddressCacheContainsAddress(Res.From)){
         Res.From = getBOLTedAddress(Res.From);
       }
