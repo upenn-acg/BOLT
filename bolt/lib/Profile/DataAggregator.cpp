@@ -1519,13 +1519,13 @@ std::error_code DataAggregator::parseBranchEvents() {
                        << Twine::utohexstr(TraceFrom - TraceBF->getAddress())
                        << " and ending @ " << Twine::utohexstr(TraceTo)
                        << '\n');
-
+/*
             outs()     << "Invalid trace starting in "
                        << TraceBF->getPrintName() << " @ "
                        << Twine::utohexstr(TraceFrom)
                        << " and ending @ " << Twine::utohexstr(TraceTo)
                        << '\n';
-
+*/
             ++NumInvalidTraces;
           } else {
             LLVM_DEBUG(dbgs()
