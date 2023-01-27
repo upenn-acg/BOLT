@@ -351,6 +351,8 @@ uint64_t BoltAddressTranslation::translateToBOLTedAddr(uint64_t origStartingAddr
   if (KeyVal == map.begin())
     return origOffset + BOLTedStartingAddr;
 
+  --KeyVal;
+
   const uint64_t Val = KeyVal->second & ~BRANCHENTRY;
   if (IsBranchSrc)
     return Val + BOLTedStartingAddr;

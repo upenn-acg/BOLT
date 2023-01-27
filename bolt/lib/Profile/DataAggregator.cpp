@@ -1069,7 +1069,7 @@ ErrorOr<LBREntry> DataAggregator::parseLBREntry() {
   // needs to be changed
 
   if (opts::ContinuousOpt && BAT){
-    if (Res.From < 0x4400000){
+    if (Res.From < 0x4400000)
       if (IllegalAddressCacheContainsAddress(Res.From)){
         Res.From = getBOLTedAddress(Res.From);
       }
@@ -1079,13 +1079,14 @@ ErrorOr<LBREntry> DataAggregator::parseLBREntry() {
           uint64_t offset = Res.From - origStartingAddr;
           Res.From = BAT->translateToBOLTedAddr(origStartingAddr, offset, true);
           insertNewAddressPair(origStartingAddr + offset, Res.From);
+          //errs()<<"0x"<<Twine::utohexstr(Res.From)<<", 0x"<<Twine::utohexstr(origStartingAddr)<<", 0x"<<Twine::utohexstr(offset)<<"\n";
         }
         else{
           insertNewAddress(Res.From);
         }
       }
     }
-    if (Res.To < 0x4400000){
+    if (Res.To < 0x4400000) {
       if (IllegalAddressCacheContainsAddress(Res.To)){
         Res.To = getBOLTedAddress(Res.To);
       }
@@ -1095,6 +1096,7 @@ ErrorOr<LBREntry> DataAggregator::parseLBREntry() {
           uint64_t offset = Res.To - origStartingAddr;
           Res.To = BAT->translateToBOLTedAddr(origStartingAddr, offset, false);
           insertNewAddressPair(origStartingAddr + offset, Res.To);
+          //errs()<<"0x"<<Twine::utohexstr(Res.To)<<", 0x"<<Twine::utohexstr(origStartingAddr)<<", 0x"<<Twine::utohexstr(offset)<<"\n";
         }
         else {
           insertNewAddress(Res.To);
@@ -1517,13 +1519,13 @@ std::error_code DataAggregator::parseBranchEvents() {
                        << Twine::utohexstr(TraceFrom - TraceBF->getAddress())
                        << " and ending @ " << Twine::utohexstr(TraceTo)
                        << '\n');
-/*
+
             outs()     << "Invalid trace starting in "
                        << TraceBF->getPrintName() << " @ "
                        << Twine::utohexstr(TraceFrom)
                        << " and ending @ " << Twine::utohexstr(TraceTo)
                        << '\n';
-*/
+
             ++NumInvalidTraces;
           } else {
             LLVM_DEBUG(dbgs()
@@ -1619,7 +1621,7 @@ std::error_code DataAggregator::parseBranchEvents() {
   }
   outs() << "\n";
   if (Perc > 10.0f)
-    outs() << "\n !! WARNING(parseBranchEvents) !! This high mismatch ratio indicates the input "
+    outs() << "\n !! WARNING (in parseBranchEvents) !! This high mismatch ratio indicates the input "
               "binary is probably not the same binary used during profiling "
               "collection. The generated data may be ineffective for improving "
               "performance.\n\n";
