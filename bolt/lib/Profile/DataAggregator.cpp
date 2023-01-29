@@ -1476,7 +1476,8 @@ std::error_code DataAggregator::parseBranchEvents() {
           fclose(fp);
           exit(-1); 
         }
-        BAT->updateFuncsOnCallStack(callStackFuncs, AddrNum); 
+        BAT->updateFuncsOnCallStack(callStackFuncs, AddrNum);
+        outs()<<"PERF2BOLT: find "<<AddrNum<<" functions on the call stack during last code replacement\n";
       }
     }
   }
