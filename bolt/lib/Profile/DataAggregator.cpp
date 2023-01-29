@@ -1087,6 +1087,12 @@ ErrorOr<LBREntry> DataAggregator::parseLBREntry() {
           insertNewAddressPair(origStartingAddr + offset, Res.From);
           //errs()<<"0x"<<Twine::utohexstr(Res.From)<<", 0x"<<Twine::utohexstr(origStartingAddr)<<", 0x"<<Twine::utohexstr(offset)<<"\n";
         }
+        else if (BAT->isAddressFromFuncOnCallStack(Res.From)){
+          uint64_t origStartingAddr = BAT->getOrigStartingAddr(Res.From);
+          uint64_t offset = Res.From - origStartingAddr;
+          Res.From = BAT->translateToBOLTedAddr(origStartingAddr, offset, true);
+          insertNewAddressPair(origStartingAddr + offset, Res.From); 
+        }
         else{
           insertNewAddress(Res.From);
         }
@@ -1104,6 +1110,12 @@ ErrorOr<LBREntry> DataAggregator::parseLBREntry() {
           insertNewAddressPair(origStartingAddr + offset, Res.To);
           //errs()<<"0x"<<Twine::utohexstr(Res.To)<<", 0x"<<Twine::utohexstr(origStartingAddr)<<", 0x"<<Twine::utohexstr(offset)<<"\n";
         }
+        else if (BAT->isAddressFromFuncOnCallStack(Res.To)){
+          uint64_t origStartingAddr = BAT->getOrigStartingAddr(Res.To);
+          uint64_t offset = Res.To - origStartingAddr;
+          Res.To = BAT->translateToBOLTedAddr(origStartingAddr, offset, true);
+          insertNewAddressPair(origStartingAddr + offset, Res.To); 
+        } 
         else {
           insertNewAddress(Res.To);
         }
