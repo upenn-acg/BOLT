@@ -16,6 +16,7 @@
 #include <map>
 #include <vector>
 #include <unordered_map>
+#include <unordered_set>
 #include <system_error>
 
 namespace llvm {
@@ -117,6 +118,7 @@ public:
 
   /// zyuxuan: this can only be coalled when in the continuous opt setting
   bool isAddressFromTheHoleOfBOLTedFunction(uint64_t Address);
+  void updateFuncsOnCallStack(uint64_t* Functions, int FuncNum);
 private:
   /// Helper to update \p Map by inserting one or more BAT entries reflecting
   /// \p BB for function located at \p FuncAddress. At least one entry will be
@@ -139,6 +141,8 @@ private:
   MapTy64 OriginalFuncTable;
   // BOLTed Func Starting Addr -> <Original Func Starting Addr, Original Func Ending Addr>
   std::map<uint64_t, std::vector<uint64_t>> FuncMapTables;
+  // The functions on the call stack when OCOLOS performed code replacement
+  std::unordered_set<uint64_t> CallStackFunctions;
 
   /// Links outlined cold bocks to their original function
   std::map<uint64_t, uint64_t> ColdPartSource;

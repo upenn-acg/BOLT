@@ -113,6 +113,12 @@ ContinuousOpt("cont-opt",
   cl::init(false),
   cl::cat(AggregatorCategory));
 
+cl::opt<std::string>
+CallStackFunc("call-stack-func",
+  cl::desc("the snapshot of the starting address of call stack functions"),
+  cl::ZeroOrMore,
+  cl::cat(AggregatorCategory));
+
 } // namespace opts
 
 namespace {
@@ -1450,6 +1456,29 @@ std::error_code DataAggregator::parseBranchEvents() {
     readBATSection(BC);
     readFuncMapTableSection(BC);
     BAT->constructReversedMaps();
+    if (!opts::CallStackFunc.empty()){
+      FILE* fp = fopen (opts::CallStackFunc.c_str(),"r");
+      if (fp==NULL){
+        errs()<<"PERF2BOLT: --call-stack-func 's parameter is wrong\n";
+        fclose(fp);
+        exit(-1);
+      } 
+      else {
+        long AddrNum;
+        if(fread(&AddrNum, sizeof(long), 1, fp)==0){
+          errs()<<"PERF2BOLT: "<<opts::CallStackFunc<<" contains nothing\n";
+          fclose(fp);
+          exit(-1);
+        }
+        uint64_t* callStackFuncs = (uint64_t*)malloc(AddrNum * sizeof(uint64_t));
+        if (fread(callStackFuncs, sizeof(uint64_t), AddrNum, fp)<=0){
+          errs()<<"PERF2BOLT: "<<opts::CallStackFunc<<" contains error message\n";
+          fclose(fp);
+          exit(-1); 
+        }
+        BAT->updateFuncsOnCallStack(callStackFuncs, AddrNum); 
+      }
+    }
   }
 
   uint64_t NumTotalSamples = 0;
