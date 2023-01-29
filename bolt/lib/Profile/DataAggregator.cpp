@@ -1113,7 +1113,7 @@ ErrorOr<LBREntry> DataAggregator::parseLBREntry() {
         else if (BAT->isAddressFromFuncOnCallStack(Res.To)){
           uint64_t origStartingAddr = BAT->getOrigStartingAddr(Res.To);
           uint64_t offset = Res.To - origStartingAddr;
-          Res.To = BAT->translateToBOLTedAddr(origStartingAddr, offset, true);
+          Res.To = BAT->translateToBOLTedAddr(origStartingAddr, offset, false);
           insertNewAddressPair(origStartingAddr + offset, Res.To); 
         } 
         else {
