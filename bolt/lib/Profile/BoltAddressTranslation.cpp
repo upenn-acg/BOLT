@@ -360,6 +360,12 @@ uint64_t BoltAddressTranslation::translateToBOLTedAddr(uint64_t origStartingAddr
 }
 
 
+void BoltAddressTranslation::updateFuncsOnCallStack(uint64_t* Functions, int FuncNum){
+  for (int i=0; i<FuncNum; i++){
+    CallStackFunctions.insert(Functions[i]);   
+  }
+}
+
 
 
 Optional<BoltAddressTranslation::FallthroughListTy>
