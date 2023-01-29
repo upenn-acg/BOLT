@@ -366,7 +366,12 @@ void BoltAddressTranslation::updateFuncsOnCallStack(uint64_t* Functions, int Fun
   }
 }
 
-
+bool BoltAddressTranslation::isAddressFromFuncOnCallStack(uint64_t Address){
+  if (CallStackFunctions.find(Address)!=CallStackFunctions.end()){
+    return true;
+  }
+  return false;
+}
 
 Optional<BoltAddressTranslation::FallthroughListTy>
 BoltAddressTranslation::getFallthroughsInTrace(const BinaryFunction &Func,

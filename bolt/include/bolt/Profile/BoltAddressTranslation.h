@@ -116,9 +116,13 @@ public:
   /// addresses when aggregating profile
   bool enabledFor(llvm::object::ELFObjectFileBase *InputFile) const;
 
-  /// zyuxuan: this can only be coalled when in the continuous opt setting
+  /// zyuxuan: this can only be called when in the continuous opt setting
   bool isAddressFromTheHoleOfBOLTedFunction(uint64_t Address);
+
+  /// zyuxuan: this can only be called when in the continuous opt setting
   void updateFuncsOnCallStack(uint64_t* Functions, int FuncNum);
+  bool isAddressFromFuncOnCallStack(uint64_t Address);
+
 private:
   /// Helper to update \p Map by inserting one or more BAT entries reflecting
   /// \p BB for function located at \p FuncAddress. At least one entry will be
