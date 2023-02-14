@@ -29,6 +29,7 @@
 #include "llvm/Support/raw_ostream.h"
 #include <map>
 #include <unordered_map>
+#include <sstream>
 
 #define DEBUG_TYPE "aggregator"
 
@@ -1082,7 +1083,7 @@ ErrorOr<LBREntry> DataAggregator::parseLBREntry() {
   // needs to be changed
 
   if (opts::ContinuousOpt && BAT){
-    if (Res.From < 0x4400000){
+    if (Res.From < BOLTedSectionStartingAddr){
       if (IllegalAddressCacheContainsAddress(Res.From)){
         Res.From = getBOLTedAddress(Res.From);
       }
@@ -1105,7 +1106,7 @@ ErrorOr<LBREntry> DataAggregator::parseLBREntry() {
         }
       }
     }
-    if (Res.To < 0x4400000) {
+    if (Res.To < BOLTedSectionStartingAddr) {
       if (IllegalAddressCacheContainsAddress(Res.To)){
         Res.To = getBOLTedAddress(Res.To);
       }
@@ -1499,6 +1500,35 @@ std::error_code DataAggregator::parseBranchEvents() {
         outs()<<"PERF2BOLT: find "<<AddrNum<<" functions on the call stack during last code replacement\n";
       }
     }
+
+    if (!opts::BinPathInfo.empty()){
+      FILE* fp = fopen (opts::BinPathInfo.c_str(),"r");
+      char * line = NULL;
+      size_t len = 0;
+      ssize_t read;
+
+      if (fp == NULL){
+        errs()<<"PERF2BOLT-ERROR: the argument of --bin-path-info doesn't exist\n";
+        exit(EXIT_FAILURE);
+      }
+         
+      std::vector<std::string> lines;
+      while ((read = getline(&line, &len, fp)) != -1) {
+        std::string l(line);
+        lines.push_back(l);
+      }
+      delete(line);
+      fclose(fp);
+      if (lines.size()!=3){
+        errs()<<"PERF2BOLT-ERROR: bin-path-info contains less than 3 lines\n";
+        exit(EXIT_FAILURE);
+      }
+      std::stringstream ss;
+      ss << std::hex << lines[2];
+      ss >> BOLTedSectionStartingAddr;
+    }
+
+
   }
 
   uint64_t NumTotalSamples = 0;
@@ -2124,43 +2154,47 @@ DataAggregator::parseMMapEvent() {
           errs()<<"PERF2BOLT-ERROR: bin-path-info contains less than 3 lines\n";
           exit(EXIT_FAILURE);
         }
+
+//        FileName = sys::path::filename(StringRef("/home/zyuxuan/ocolos_data/mysqld.bolt"));
+        FileName = sys::path::filename(StringRef(lines[0]));
+
+        const StringRef PIDStr = Line.split(FieldSeparator).second.split('/').first;
+        if (PIDStr.getAsInteger(10, ParsedInfo.PID)) {
+          reportError("expected PID");
+          Diag << "Found: " << PIDStr << "in '" << Line << "'\n";
+          return make_error_code(llvm::errc::io_error);
+        }
+
+        const StringRef BaseAddressStr = Line.split('[').second.split('(').first;
+        if (BaseAddressStr.getAsInteger(0, ParsedInfo.BaseAddress)) {
+          reportError("expected base address");
+          Diag << "Found: " << BaseAddressStr << "in '" << Line << "'\n";
+          return make_error_code(llvm::errc::io_error);
+        }
+
+        const StringRef SizeStr = Line.split('(').second.split(')').first;
+        if (SizeStr.getAsInteger(0, ParsedInfo.Size)) {
+          reportError("expected mmaped size");
+          Diag << "Found: " << SizeStr << "in '" << Line << "'\n";
+          return make_error_code(llvm::errc::io_error);
+        }
+
+        const StringRef OffsetStr = StringRef("0x4200000");
+        //const StringRef OffsetStr =
+        //    Line.split('@').second.ltrim().split(FieldSeparator).first;
+        if (OffsetStr.getAsInteger(0, ParsedInfo.Offset)) {
+          reportError("expected mmaped page-aligned offset");
+          Diag << "Found: " << OffsetStr << "in '" << Line << "'\n";
+          return make_error_code(llvm::errc::io_error);
+        }
+
+        consumeRestOfLine();
       }
       else {
         errs()<<"PERF2BOLT-ERROR: please use --bin-path-info to specify the binary info\n";
-      }
-      FileName = sys::path::filename(StringRef("/home/zyuxuan/ocolos_data/mysqld.bolt"));
+        exit(EXIT_FAILURE);
 
-      const StringRef PIDStr = Line.split(FieldSeparator).second.split('/').first;
-      if (PIDStr.getAsInteger(10, ParsedInfo.PID)) {
-        reportError("expected PID");
-        Diag << "Found: " << PIDStr << "in '" << Line << "'\n";
-        return make_error_code(llvm::errc::io_error);
       }
-
-      const StringRef BaseAddressStr = Line.split('[').second.split('(').first;
-      if (BaseAddressStr.getAsInteger(0, ParsedInfo.BaseAddress)) {
-        reportError("expected base address");
-        Diag << "Found: " << BaseAddressStr << "in '" << Line << "'\n";
-        return make_error_code(llvm::errc::io_error);
-      }
-
-      const StringRef SizeStr = Line.split('(').second.split(')').first;
-      if (SizeStr.getAsInteger(0, ParsedInfo.Size)) {
-        reportError("expected mmaped size");
-        Diag << "Found: " << SizeStr << "in '" << Line << "'\n";
-        return make_error_code(llvm::errc::io_error);
-      }
-
-      const StringRef OffsetStr = StringRef("0x4200000");
-      //const StringRef OffsetStr =
-      //    Line.split('@').second.ltrim().split(FieldSeparator).first;
-      if (OffsetStr.getAsInteger(0, ParsedInfo.Offset)) {
-        reportError("expected mmaped page-aligned offset");
-        Diag << "Found: " << OffsetStr << "in '" << Line << "'\n";
-        return make_error_code(llvm::errc::io_error);
-      }
-
-      consumeRestOfLine();
     }
     else {
       FileName = sys::path::filename(FileName);
