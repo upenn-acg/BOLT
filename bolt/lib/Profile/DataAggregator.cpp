@@ -2134,8 +2134,8 @@ DataAggregator::parseMMapEvent() {
         return make_error_code(llvm::errc::io_error);
       }
 
-      const StringRef OffsetStr = StringRef("0x4200000");
-      //const StringRef OffsetStr =
+      const StringRef OffsetStr = StringRef("0x"+BOLTedBinInfo[3]);
+      //const StringRef OffsetStr = StringRef("0x4200000");
       //    Line.split('@').second.ltrim().split(FieldSeparator).first;
       if (OffsetStr.getAsInteger(0, ParsedInfo.Offset)) {
         reportError("expected mmaped page-aligned offset");
@@ -2147,9 +2147,17 @@ DataAggregator::parseMMapEvent() {
     else {
       FileName = sys::path::filename(FileName);
 
+      StringRef origBinName = sys::path::filename(BOLTedBinInfo[1]);
+      StringRef BOLTedBinName = sys::path::filename(BOLTedBinInfo[0]);
+/*
       if (FileName.compare(StringRef("mysqld"))==0){
          FileName = StringRef("mysqld.bolt");
       }
+*/
+      if (FileName.compare(StringRef(origBinName))==0){
+         FileName = StringRef(BOLTedBinName);
+      }
+
       const StringRef PIDStr = Line.split(FieldSeparator).second.split('/').first;
       if (PIDStr.getAsInteger(10, ParsedInfo.PID)) {
         reportError("expected PID");
