@@ -546,6 +546,8 @@ void RewriteInstance::discoverStorage() {
            << Twine::utohexstr(NextAvailableOffset) << '\n';
 
     outs() <<"#### "<<Twine::utohexstr(NextAvailableAddress)<<"\n";
+    outs() <<"#### "<<Twine::utohexstr(NextAvailableOffset)<<"\n";
+
 
     PHDRTableAddress = NextAvailableAddress;
     PHDRTableOffset = NextAvailableOffset;

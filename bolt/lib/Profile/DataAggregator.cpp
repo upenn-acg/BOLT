@@ -1519,8 +1519,8 @@ std::error_code DataAggregator::parseBranchEvents() {
       }
       delete(line);
       fclose(fp);
-      if (lines.size()!=3){
-        errs()<<"PERF2BOLT-ERROR: bin-path-info contains less than 3 lines\n";
+      if (lines.size()<4){
+        errs()<<"PERF2BOLT-ERROR: bin-path-info contains less than 4 lines\n";
         exit(EXIT_FAILURE);
       }
       std::stringstream ss;
@@ -2150,8 +2150,8 @@ DataAggregator::parseMMapEvent() {
         }
         delete(line);
         fclose(fp);
-        if (lines.size()!=3){
-          errs()<<"PERF2BOLT-ERROR: bin-path-info contains less than 3 lines\n";
+        if (lines.size()<4){
+          errs()<<"PERF2BOLT-ERROR: bin-path-info contains less than 4 lines\n";
           exit(EXIT_FAILURE);
         }
 
@@ -2198,6 +2198,31 @@ DataAggregator::parseMMapEvent() {
     }
     else {
       FileName = sys::path::filename(FileName);
+
+      if (!opts::BinPathInfo.empty()){
+        FILE* fp = fopen (opts::BinPathInfo.c_str(),"r");
+        char * line = NULL;
+        size_t len = 0;
+        ssize_t read;
+
+        if (fp == NULL){
+          errs()<<"PERF2BOLT-ERROR: the argument of --bin-path-info doesn't exist\n";
+          exit(EXIT_FAILURE);
+        }
+         
+        std::vector<std::string> lines;
+        while ((read = getline(&line, &len, fp)) != -1) {
+          std::string l(line);
+          lines.push_back(l);
+        }
+        delete(line);
+        fclose(fp);
+        if (lines.size()<4){
+          errs()<<"PERF2BOLT-ERROR: bin-path-info contains less than 4 lines\n";
+          exit(EXIT_FAILURE);
+        }
+      }
+
       if (FileName.compare(StringRef("mysqld"))==0){
          FileName = StringRef("mysqld.bolt");
       }
