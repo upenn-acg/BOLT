@@ -489,6 +489,11 @@ Error DataAggregator::preprocessProfile(BinaryContext &BC) {
               "not read one from input binary\n";
   }
 
+  if (opts::ContinuousOpt && BAT){
+    if (!opts::BinPathInfo.empty())
+      updateBOLTedBinInfo(opts::BinPathInfo.c_str());
+  }
+
   auto prepareToParse = [&](StringRef Name, PerfProcessInfo &Process) {
     std::string Error;
     outs() << "PERF2BOLT: waiting for perf " << Name
@@ -1500,35 +1505,6 @@ std::error_code DataAggregator::parseBranchEvents() {
         outs()<<"PERF2BOLT: find "<<AddrNum<<" functions on the call stack during last code replacement\n";
       }
     }
-
-    if (!opts::BinPathInfo.empty()){
-      FILE* fp = fopen (opts::BinPathInfo.c_str(),"r");
-      char * line = NULL;
-      size_t len = 0;
-      ssize_t read;
-
-      if (fp == NULL){
-        errs()<<"PERF2BOLT-ERROR: the argument of --bin-path-info doesn't exist\n";
-        exit(EXIT_FAILURE);
-      }
-         
-      std::vector<std::string> lines;
-      while ((read = getline(&line, &len, fp)) != -1) {
-        std::string l(line);
-        lines.push_back(l);
-      }
-      delete(line);
-      fclose(fp);
-      if (lines.size()<4){
-        errs()<<"PERF2BOLT-ERROR: bin-path-info contains less than 4 lines\n";
-        exit(EXIT_FAILURE);
-      }
-      std::stringstream ss;
-      ss << std::hex << lines[2];
-      ss >> BOLTedSectionStartingAddr;
-    }
-
-
   }
 
   uint64_t NumTotalSamples = 0;
@@ -2132,31 +2108,7 @@ DataAggregator::parseMMapEvent() {
     }
     else if (FileName.startswith("//")){
       if (!opts::BinPathInfo.empty()){
-        FILE* fp = fopen (opts::BinPathInfo.c_str(),"r");
-        char * line = NULL;
-        size_t len = 0;
-        ssize_t read;
-
-        if (fp == NULL){
-          errs()<<"PERF2BOLT-ERROR: the argument of --bin-path-info doesn't exist\n";
-          exit(EXIT_FAILURE);
-        }
-         
-        std::vector<std::string> lines;
-        while ((read = getline(&line, &len, fp)) != -1) {
-          //printf("%s", line);
-          std::string l(line);
-          lines.push_back(l);
-        }
-        delete(line);
-        fclose(fp);
-        if (lines.size()<4){
-          errs()<<"PERF2BOLT-ERROR: bin-path-info contains less than 4 lines\n";
-          exit(EXIT_FAILURE);
-        }
-
-//        FileName = sys::path::filename(StringRef("/home/zyuxuan/ocolos_data/mysqld.bolt"));
-        FileName = sys::path::filename(StringRef(lines[0]));
+        FileName = sys::path::filename(StringRef(BOLTedBinInfo[0]));
 
         const StringRef PIDStr = Line.split(FieldSeparator).second.split('/').first;
         if (PIDStr.getAsInteger(10, ParsedInfo.PID)) {
