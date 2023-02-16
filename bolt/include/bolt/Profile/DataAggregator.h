@@ -105,8 +105,10 @@ public:
   }
 
 private:
+  // zyuxuan: to support ocolos cont-opt
   std::unordered_map<uint64_t, uint64_t> IllegalAddressCache;
   std::unordered_set<uint64_t> LegalAddressCache;
+  uint64_t BOLTedSectionStartingAddr;
 
   struct PerfBranchSample {
     SmallVector<LBREntry, 32> LBR;
