@@ -20,6 +20,7 @@
 #include "llvm/Support/Program.h"
 #include <unordered_map>
 #include <unordered_set>
+#include <sstream>
 
 namespace llvm {
 namespace bolt {
@@ -104,11 +105,43 @@ public:
     return IllegalAddressCache[originalAddress]; 
   }
 
+  void updateBOLTedBinInfo(const char* BinPath){
+    FILE* fp = fopen (BinPath,"r");
+    char * line = NULL;
+    size_t len = 0;
+    ssize_t read;
+
+    if (fp == NULL){
+      errs()<<"PERF2BOLT-ERROR: the argument of --bin-path-info doesn't exist\n";
+      exit(EXIT_FAILURE);
+    }
+
+    while ((read = getline(&line, &len, fp)) != -1) {
+      //printf("%s", line);
+      std::string l(line);
+      if ((l.size()!=0)&&(l[l.size()-1]=='\n')){
+        l.pop_back();
+      }
+      BOLTedBinInfo.push_back(l);
+    }
+    delete(line);
+    fclose(fp);
+    if (BOLTedBinInfo.size()<4){
+      errs()<<"PERF2BOLT-ERROR: bin-path-info contains less than 4 lines\n";
+      exit(EXIT_FAILURE);
+    }
+
+    std::stringstream ss;
+    ss << std::hex << BOLTedBinInfo[2];
+    ss >> BOLTedSectionStartingAddr;
+  }
+
 private:
   // zyuxuan: to support ocolos cont-opt
   std::unordered_map<uint64_t, uint64_t> IllegalAddressCache;
   std::unordered_set<uint64_t> LegalAddressCache;
   uint64_t BOLTedSectionStartingAddr;
+  std::vector<std::string> BOLTedBinInfo;
 
   struct PerfBranchSample {
     SmallVector<LBREntry, 32> LBR;
