@@ -492,6 +492,10 @@ Error DataAggregator::preprocessProfile(BinaryContext &BC) {
   if (opts::ContinuousOpt && BAT){
     if (!opts::BinPathInfo.empty())
       updateBOLTedBinInfo(opts::BinPathInfo.c_str());
+    else {
+      errs()<<"PERF2BOLT-ERROR: please specify --bin-path-info \n";
+      exit(EXIT_FAILURE);
+    }  
   }
 
   auto prepareToParse = [&](StringRef Name, PerfProcessInfo &Process) {
@@ -2107,73 +2111,41 @@ DataAggregator::parseMMapEvent() {
       return std::make_pair(StringRef(), ParsedInfo);
     }
     else if (FileName.startswith("//")){
-      if (!opts::BinPathInfo.empty()){
-        FileName = sys::path::filename(StringRef(BOLTedBinInfo[0]));
+      FileName = sys::path::filename(StringRef(BOLTedBinInfo[0]));
 
-        const StringRef PIDStr = Line.split(FieldSeparator).second.split('/').first;
-        if (PIDStr.getAsInteger(10, ParsedInfo.PID)) {
-          reportError("expected PID");
-          Diag << "Found: " << PIDStr << "in '" << Line << "'\n";
-          return make_error_code(llvm::errc::io_error);
-        }
-
-        const StringRef BaseAddressStr = Line.split('[').second.split('(').first;
-        if (BaseAddressStr.getAsInteger(0, ParsedInfo.BaseAddress)) {
-          reportError("expected base address");
-          Diag << "Found: " << BaseAddressStr << "in '" << Line << "'\n";
-          return make_error_code(llvm::errc::io_error);
-        }
-
-        const StringRef SizeStr = Line.split('(').second.split(')').first;
-        if (SizeStr.getAsInteger(0, ParsedInfo.Size)) {
-          reportError("expected mmaped size");
-          Diag << "Found: " << SizeStr << "in '" << Line << "'\n";
-          return make_error_code(llvm::errc::io_error);
-        }
-
-        const StringRef OffsetStr = StringRef("0x4200000");
-        //const StringRef OffsetStr =
-        //    Line.split('@').second.ltrim().split(FieldSeparator).first;
-        if (OffsetStr.getAsInteger(0, ParsedInfo.Offset)) {
-          reportError("expected mmaped page-aligned offset");
-          Diag << "Found: " << OffsetStr << "in '" << Line << "'\n";
-          return make_error_code(llvm::errc::io_error);
-        }
-
-        consumeRestOfLine();
+      const StringRef PIDStr = Line.split(FieldSeparator).second.split('/').first;
+      if (PIDStr.getAsInteger(10, ParsedInfo.PID)) {
+        reportError("expected PID");
+        Diag << "Found: " << PIDStr << "in '" << Line << "'\n";
+        return make_error_code(llvm::errc::io_error);
       }
-      else {
-        errs()<<"PERF2BOLT-ERROR: please use --bin-path-info to specify the binary info\n";
-        exit(EXIT_FAILURE);
 
+      const StringRef BaseAddressStr = Line.split('[').second.split('(').first;
+      if (BaseAddressStr.getAsInteger(0, ParsedInfo.BaseAddress)) {
+        reportError("expected base address");
+        Diag << "Found: " << BaseAddressStr << "in '" << Line << "'\n";
+        return make_error_code(llvm::errc::io_error);
       }
+
+      const StringRef SizeStr = Line.split('(').second.split(')').first;
+      if (SizeStr.getAsInteger(0, ParsedInfo.Size)) {
+        reportError("expected mmaped size");
+        Diag << "Found: " << SizeStr << "in '" << Line << "'\n";
+        return make_error_code(llvm::errc::io_error);
+      }
+
+      const StringRef OffsetStr = StringRef("0x4200000");
+      //const StringRef OffsetStr =
+      //    Line.split('@').second.ltrim().split(FieldSeparator).first;
+      if (OffsetStr.getAsInteger(0, ParsedInfo.Offset)) {
+        reportError("expected mmaped page-aligned offset");
+        Diag << "Found: " << OffsetStr << "in '" << Line << "'\n";
+        return make_error_code(llvm::errc::io_error);
+      }
+      consumeRestOfLine();
     }
     else {
       FileName = sys::path::filename(FileName);
-
-      if (!opts::BinPathInfo.empty()){
-        FILE* fp = fopen (opts::BinPathInfo.c_str(),"r");
-        char * line = NULL;
-        size_t len = 0;
-        ssize_t read;
-
-        if (fp == NULL){
-          errs()<<"PERF2BOLT-ERROR: the argument of --bin-path-info doesn't exist\n";
-          exit(EXIT_FAILURE);
-        }
-         
-        std::vector<std::string> lines;
-        while ((read = getline(&line, &len, fp)) != -1) {
-          std::string l(line);
-          lines.push_back(l);
-        }
-        delete(line);
-        fclose(fp);
-        if (lines.size()<4){
-          errs()<<"PERF2BOLT-ERROR: bin-path-info contains less than 4 lines\n";
-          exit(EXIT_FAILURE);
-        }
-      }
 
       if (FileName.compare(StringRef("mysqld"))==0){
          FileName = StringRef("mysqld.bolt");
