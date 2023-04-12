@@ -466,6 +466,8 @@ void RewriteInstance::discoverStorage() {
       NextAvailableOffset = std::max(NextAvailableOffset,
                                      Phdr.p_offset + Phdr.p_filesz);
 
+      llvm::outs()<<"()()()"<<utohexstr(NextAvailableAddress)<<"\n";
+
       BC->SegmentMapInfo[Phdr.p_vaddr] = SegmentInfo{Phdr.p_vaddr,
                                                      Phdr.p_memsz,
                                                      Phdr.p_offset,
@@ -509,6 +511,8 @@ void RewriteInstance::discoverStorage() {
 
   NextAvailableAddress = alignTo(NextAvailableAddress, BC->PageAlign);
   NextAvailableOffset = alignTo(NextAvailableOffset, BC->PageAlign);
+
+  llvm::outs()<<"()()()()"<<utohexstr(NextAvailableAddress)<<"\n";
 
   if (!opts::UseGnuStack) {
     // This is where the black magic happens. Creating PHDR table in a segment
@@ -2544,6 +2548,14 @@ void RewriteInstance::selectFunctionsToProcess() {
 
   uint64_t NumFunctionsToProcess = 0;
   auto shouldProcess = [&](const BinaryFunction &Function) {
+
+    if (Function.getOneName()=="_Z7do_workPv"){
+      return true;  
+    }
+    else{
+      return false;
+    }
+
     if (opts::MaxFunctions && NumFunctionsToProcess > opts::MaxFunctions)
       return false;
 
@@ -3401,6 +3413,7 @@ void RewriteInstance::mapCodeSections(RuntimeDyld &RTDyld) {
     // Map sections for functions with pre-assigned addresses.
     for (BinaryFunction *InjectedFunction : BC->getInjectedBinaryFunctions()) {
       const uint64_t OutputAddress = InjectedFunction->getOutputAddress();
+      llvm::outs()<<"### outputAddress = "<<Twine::utohexstr(OutputAddress)<<"\n";
       if (!OutputAddress)
         continue;
 
@@ -3413,6 +3426,8 @@ void RewriteInstance::mapCodeSections(RuntimeDyld &RTDyld) {
       InjectedFunction->setImageAddress(FunctionSection->getAllocAddress());
       InjectedFunction->setImageSize(FunctionSection->getOutputSize());
     }
+
+    llvm::outs()<<"#######################\n";
 
     // Populate the list of sections to be allocated.
     std::vector<BinarySection *> CodeSections = getCodeSections();
@@ -3436,6 +3451,7 @@ void RewriteInstance::mapCodeSections(RuntimeDyld &RTDyld) {
       for (BinarySection *Section : CodeSections) {
         Address = alignTo(Address, Section->getAlignment());
         Section->setOutputAddress(Address);
+        llvm::outs()<<"### "<<Section->getName()<<", "<<utohexstr(Section->getOutputAddress())<<"\n";
         Address += Section->getOutputSize();
       }
 
@@ -3450,6 +3466,7 @@ void RewriteInstance::mapCodeSections(RuntimeDyld &RTDyld) {
         }
       }
       return Address;
+      
     };
 
     // Check if we can fit code in the original .text
@@ -3471,8 +3488,9 @@ void RewriteInstance::mapCodeSections(RuntimeDyld &RTDyld) {
       }
     }
 
-    if (!AllocationDone)
+    if (!AllocationDone){
       NextAvailableAddress = allocateAt(NextAvailableAddress);
+    }
 
     // Do the mapping for ORC layer based on the allocation.
     for (BinarySection *Section : CodeSections) {
