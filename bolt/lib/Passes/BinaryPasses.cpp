@@ -383,6 +383,7 @@ void EliminateUnreachableBlocks::runOnFunction(BinaryFunction &Function) {
 }
 
 void EliminateUnreachableBlocks::runOnFunctions(BinaryContext &BC) {
+/*
   for (auto &It : BC.getBinaryFunctions()) {
     BinaryFunction &Function = It.second;
     if (shouldOptimize(Function))
@@ -391,6 +392,7 @@ void EliminateUnreachableBlocks::runOnFunctions(BinaryContext &BC) {
 
   outs() << "BOLT-INFO: UCE removed " << DeletedBlocks << " blocks and "
          << DeletedBytes << " bytes of code.\n";
+*/
 }
 
 bool ReorderBasicBlocks::shouldPrint(const BinaryFunction &BF) const {
@@ -407,6 +409,7 @@ bool ReorderBasicBlocks::shouldOptimize(const BinaryFunction &BF) const {
 }
 
 void ReorderBasicBlocks::runOnFunctions(BinaryContext &BC) {
+/*
   if (opts::ReorderBlocks == ReorderBasicBlocks::LT_NONE)
     return;
 
@@ -464,6 +467,7 @@ void ReorderBasicBlocks::runOnFunctions(BinaryContext &BC) {
          << Function.getEditDistance() << "\n\n";
     }
   }
+*/
 }
 
 void ReorderBasicBlocks::modifyFunctionLayout(BinaryFunction &BF,
@@ -536,6 +540,7 @@ void FixupBranches::runOnFunctions(BinaryContext &BC) {
 }
 
 void FinalizeFunctions::runOnFunctions(BinaryContext &BC) {
+/*
   ParallelUtilities::WorkFuncTy WorkFun = [&](BinaryFunction &BF) {
     if (!BF.finalizeCFIState()) {
       if (BC.HasRelocations) {
@@ -560,6 +565,7 @@ void FinalizeFunctions::runOnFunctions(BinaryContext &BC) {
   ParallelUtilities::runOnEachFunction(
       BC, ParallelUtilities::SchedulingPolicy::SP_CONSTANT, WorkFun,
       SkipPredicate, "FinalizeFunctions");
+*/
 }
 
 void CheckLargeFunctions::runOnFunctions(BinaryContext &BC) {
@@ -1093,6 +1099,7 @@ void Peepholes::removeUselessCondBranches(BinaryFunction &Function) {
 }
 
 void Peepholes::runOnFunctions(BinaryContext &BC) {
+/*
   const char Opts = std::accumulate(
       opts::Peepholes.begin(), opts::Peepholes.end(), 0,
       [](const char A, const opts::PeepholeOpts B) { return A | B; });
@@ -1117,6 +1124,7 @@ void Peepholes::runOnFunctions(BinaryContext &BC) {
          << " tail call traps inserted.\n"
          << "BOLT-INFO: Peephole: " << NumUselessCondBranches
          << " useless conditional branches removed.\n";
+*/
 }
 
 bool SimplifyRODataLoads::simplifyRODataLoads(BinaryFunction &BF) {
@@ -1621,6 +1629,7 @@ void InstructionLowering::runOnFunctions(BinaryContext &BC) {
 }
 
 void StripRepRet::runOnFunctions(BinaryContext &BC) {
+/*
   uint64_t NumPrefixesRemoved = 0;
   uint64_t NumBytesSaved = 0;
   for (auto &BFI : BC.getBinaryFunctions()) {
@@ -1640,6 +1649,7 @@ void StripRepRet::runOnFunctions(BinaryContext &BC) {
            << " 'repz' prefixes"
               " with estimated execution count of "
            << NumPrefixesRemoved << " times.\n";
+*/
 }
 
 void InlineMemcpy::runOnFunctions(BinaryContext &BC) {
@@ -1837,6 +1847,7 @@ void RemoveNops::runOnFunction(BinaryFunction &BF) {
 }
 
 void RemoveNops::runOnFunctions(BinaryContext &BC) {
+/*
   ParallelUtilities::WorkFuncTy WorkFun = [&](BinaryFunction &BF) {
     runOnFunction(BF);
   };
@@ -1848,6 +1859,7 @@ void RemoveNops::runOnFunctions(BinaryContext &BC) {
   ParallelUtilities::runOnEachFunction(
       BC, ParallelUtilities::SchedulingPolicy::SP_INST_LINEAR, WorkFun,
       SkipFunc, "RemoveNops");
+*/
 }
 
 } // namespace bolt
