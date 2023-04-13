@@ -348,23 +348,23 @@ void MachORewriteInstance::postProcessFunctions() {
 void MachORewriteInstance::runOptimizationPasses() {
   BinaryFunctionPassManager Manager(*BC);
   if (opts::Instrument) {
-    Manager.registerPass(std::make_unique<PatchEntries>());
-    Manager.registerPass(std::make_unique<Instrumentation>(opts::NeverPrint));
+    //Manager.registerPass(std::make_unique<PatchEntries>());
+    //Manager.registerPass(std::make_unique<Instrumentation>(opts::NeverPrint));
   }
 
-  Manager.registerPass(std::make_unique<ShortenInstructions>(opts::NeverPrint));
+  //Manager.registerPass(std::make_unique<ShortenInstructions>(opts::NeverPrint));
 
-  Manager.registerPass(std::make_unique<RemoveNops>(opts::NeverPrint));
+  //Manager.registerPass(std::make_unique<RemoveNops>(opts::NeverPrint));
 
-  Manager.registerPass(std::make_unique<NormalizeCFG>(opts::PrintNormalized));
+  //Manager.registerPass(std::make_unique<NormalizeCFG>(opts::PrintNormalized));
 
-  Manager.registerPass(
-      std::make_unique<ReorderBasicBlocks>(opts::PrintReordered));
-  Manager.registerPass(
-      std::make_unique<FixupBranches>(opts::PrintAfterBranchFixup));
+  //Manager.registerPass(
+  //    std::make_unique<ReorderBasicBlocks>(opts::PrintReordered));
+  //Manager.registerPass(
+  //    std::make_unique<FixupBranches>(opts::PrintAfterBranchFixup));
   // This pass should always run last.*
-  Manager.registerPass(
-      std::make_unique<FinalizeFunctions>(opts::PrintFinalized));
+  //Manager.registerPass(
+  //    std::make_unique<FinalizeFunctions>(opts::PrintFinalized));
 
   Manager.runPasses();
 }
