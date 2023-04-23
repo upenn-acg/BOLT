@@ -248,7 +248,7 @@ private:
 
   BinaryContext &BC;
 
-  std::unique_ptr<BinaryLoopInfo> BLI;
+  //std::unique_ptr<BinaryLoopInfo> BLI;
 
   /// Set of external addresses in the code that are not a function start
   /// and are referenced from this function.
@@ -874,6 +874,9 @@ public:
   bool hasLoopInfo() const { return BLI != nullptr; }
 
   const BinaryLoopInfo &getLoopInfo() { return *BLI.get(); }
+
+  std::unique_ptr<BinaryLoopInfo> BLI;
+
 
   bool isLoopFree() {
     if (!hasLoopInfo())

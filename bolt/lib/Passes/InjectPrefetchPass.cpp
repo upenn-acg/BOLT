@@ -12,6 +12,7 @@
 
 #include "bolt/Passes/InjectPrefetchPass.h"
 #include "bolt/Core/ParallelUtilities.h"
+#include <stack>
 
 using namespace llvm;
 
@@ -30,11 +31,22 @@ namespace llvm {
 namespace bolt {
 
 bool InjectPrefetchPass::runOnFunction(BinaryFunction &BF) {
-  bool IsChanged = false;
-  if (BF.layout_size() < 3 || !BF.hasValidProfile())
-    return false;
 
   BF.updateLayoutIndices();
+
+  BinaryDominatorTree DomTree;
+  DomTree.recalculate(BF);
+  BF.BLI.reset(new BinaryLoopInfo());
+  BF.BLI->analyze(DomTree);
+
+  std::stack<BinaryLoop *> St;
+  for (auto I = BF.BLI->begin(), E = BF.BLI->end(); I != E; ++I) {
+    St.push(*I);
+    ++BF.BLI->OuterLoops;
+  }
+
+  llvm::outs()<<"@@@@@ number of loops: "<<BF.BLI->OuterLoops<<"\n";
+/*
   for (BinaryBasicBlock *BB : BF.layout()) {
     if (BB->succ_size() != 1 || BB->pred_size() != 1)
       continue;
@@ -76,14 +88,16 @@ bool InjectPrefetchPass::runOnFunction(BinaryFunction &BF) {
   }
 
   return IsChanged;
+   */
+   return true;
 }
 
 void InjectPrefetchPass::runOnFunctions(BinaryContext &BC) {
-/*
+
   std::atomic<uint64_t> ModifiedFuncCount{0};
-  if (opts::ReorderBlocks == ReorderBasicBlocks::LT_NONE ||
-      opts::LoopReorder == false)
-    return;
+//  if (opts::ReorderBlocks == ReorderBasicBlocks::LT_NONE ||
+//      opts::LoopReorder == false)
+//    return;
 
   ParallelUtilities::WorkFuncTy WorkFun = [&](BinaryFunction &BF) {
     if (runOnFunction(BF))
@@ -100,7 +114,6 @@ void InjectPrefetchPass::runOnFunctions(BinaryContext &BC) {
 
   outs() << "BOLT-INFO: " << ModifiedFuncCount
          << " Functions were reordered by InjectPrefetchPass\n";
-*/
 }
 
 } // end namespace bolt
