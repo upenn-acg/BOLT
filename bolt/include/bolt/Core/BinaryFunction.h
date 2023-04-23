@@ -296,7 +296,7 @@ private:
 
   /// In AArch64, preserve nops to maintain code equal to input (assuming no
   /// optimizations are done).
-  bool PreserveNops{false};
+  bool PreserveNops{true};
 
   /// Indicate if this function has associated exception handling metadata.
   bool HasEHRanges{false};
