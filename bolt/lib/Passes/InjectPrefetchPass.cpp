@@ -12,25 +12,42 @@
 
 #include "bolt/Passes/InjectPrefetchPass.h"
 #include "bolt/Core/ParallelUtilities.h"
-#include <stack>
 
 using namespace llvm;
 
 namespace opts {
+/*
 extern cl::OptionCategory BoltCategory;
 
 extern cl::opt<bolt::ReorderBasicBlocks::LayoutType> ReorderBlocks;
+
 
 static cl::opt<bool> LoopReorder(
     "loop-inversion-opt",
     cl::desc("reorder unconditional jump instructions in loops optimization"),
     cl::init(true), cl::cat(BoltCategory), cl::ReallyHidden);
+*/
 } // namespace opts
 
 namespace llvm {
 namespace bolt {
 
 bool InjectPrefetchPass::runOnFunction(BinaryFunction &BF) {
+  // get the Basic Block that contains the TOP LLC miss
+  // instruction. 
+  BinaryContext& BC = BF.getBinaryContext();
+
+  for (auto BB = BF.begin(); BB != BF.end(); BB++){
+    for (auto It = BB->begin(); It != BB->end(); It++){
+      llvm::outs()<<"##### \n";
+      if (BC.MIB->hasAnnotation(*It, "Offset")){
+        llvm::outs()<<"kkkkkkk\n";
+      }
+    }
+  }
+
+
+  if (BF.getOneName() != "_Z7do_workPv") return false;
 
   BF.updateLayoutIndices();
 
@@ -39,13 +56,35 @@ bool InjectPrefetchPass::runOnFunction(BinaryFunction &BF) {
   BF.BLI.reset(new BinaryLoopInfo());
   BF.BLI->analyze(DomTree);
 
-  std::stack<BinaryLoop *> St;
+  std::vector<BinaryLoop *> OuterLoops;
+  std::vector<BinaryLoop *> InnerLoops;
   for (auto I = BF.BLI->begin(), E = BF.BLI->end(); I != E; ++I) {
-    St.push(*I);
+    OuterLoops.push_back(*I);
     ++BF.BLI->OuterLoops;
   }
 
-  llvm::outs()<<"@@@@@ number of loops: "<<BF.BLI->OuterLoops<<"\n";
+  llvm::outs()<<"@@@@@ number of outer loops: "<<BF.BLI->OuterLoops<<"\n";
+
+  while (!OuterLoops.empty()) {
+    BinaryLoop *L = OuterLoops.back();
+    OuterLoops.pop_back();
+    InnerLoops.clear();
+    ++BF.BLI->TotalLoops;
+    BF.BLI->MaximumDepth = std::max(L->getLoopDepth(), BF.BLI->MaximumDepth);
+
+    // get nested loops.
+    for (BinaryLoop::iterator I = L->begin(), E = L->end(); I != E; ++I)
+      InnerLoops.push_back(*I);
+
+    // Compute back edge count.
+    SmallVector<BinaryBasicBlock *, 1> Latches;
+    L->getLoopLatches(Latches);
+    llvm::outs()<<"@@@@@ number of inner loops: "<< InnerLoops.size()<<"\n";
+    for(BinaryBasicBlock *BB : L->getBlocks()){
+      printf("xxxxxx\n");
+    }    
+
+  }
 /*
   for (BinaryBasicBlock *BB : BF.layout()) {
     if (BB->succ_size() != 1 || BB->pred_size() != 1)
@@ -93,19 +132,27 @@ bool InjectPrefetchPass::runOnFunction(BinaryFunction &BF) {
 }
 
 void InjectPrefetchPass::runOnFunctions(BinaryContext &BC) {
+   for (auto &it: BC.getBinaryFunctions()){
+      runOnFunction(it.second);
+   }
 
+/*
   std::atomic<uint64_t> ModifiedFuncCount{0};
 //  if (opts::ReorderBlocks == ReorderBasicBlocks::LT_NONE ||
 //      opts::LoopReorder == false)
 //    return;
 
+  llvm::errs()<<"hhhhhhhhhhhhhhh\n";
+
   ParallelUtilities::WorkFuncTy WorkFun = [&](BinaryFunction &BF) {
+    llvm::errs()<<"iiiiiiiiiiiiiiii\n";
     if (runOnFunction(BF))
       ++ModifiedFuncCount;
   };
 
   ParallelUtilities::PredicateTy SkipFunc = [&](const BinaryFunction &BF) {
-    return !shouldOptimize(BF);
+//    return !shouldOptimize(BF);
+    return true;
   };
 
   ParallelUtilities::runOnEachFunction(
@@ -114,6 +161,7 @@ void InjectPrefetchPass::runOnFunctions(BinaryContext &BC) {
 
   outs() << "BOLT-INFO: " << ModifiedFuncCount
          << " Functions were reordered by InjectPrefetchPass\n";
+*/
 }
 
 } // end namespace bolt
