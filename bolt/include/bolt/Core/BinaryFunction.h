@@ -198,7 +198,6 @@ public:
   using const_cfi_iterator = CFIInstrMapType::const_iterator;
 
 private:
-
   /// Current state of the function.
   State CurrentState{State::Empty};
 
@@ -729,8 +728,6 @@ private:
   }
 
 public:
-  std::unordered_map<uint64_t, MCInst* > InstructionWithAddr;
-
   BinaryFunction(BinaryFunction &&) = default;
 
   using iterator = pointee_iterator<BasicBlockListType::iterator>;
