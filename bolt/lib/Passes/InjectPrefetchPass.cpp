@@ -54,7 +54,6 @@ bool InjectPrefetchPass::runOnFunction(BinaryFunction &BF) {
       const MCInst &Instr = *It;
       if (BC.MIB->hasAnnotation(Instr, "AbsoluteAddr")){
         uint64_t AbsoluteAddr = (uint64_t)BC.MIB->getAnnotationAs<uint64_t>(Instr, "AbsoluteAddr");        
-        //llvm::outs()<<"@@@ "<<utohexstr((long)AbsoluteAddr)<<"\n";
         if (AbsoluteAddr == 0x401520){
           llvm::outs()<<"[InjectPrefetchPass] find instruction that causes the TOP LLC miss\n";
           TopLLCMissBB = &BB;
@@ -63,7 +62,6 @@ bool InjectPrefetchPass::runOnFunction(BinaryFunction &BF) {
     }
   }
 
-  // get loops in the function
   BF.updateLayoutIndices();
 
   BinaryDominatorTree DomTree;
@@ -72,35 +70,78 @@ bool InjectPrefetchPass::runOnFunction(BinaryFunction &BF) {
   BF.BLI->analyze(DomTree);
 
   std::vector<BinaryLoop *> OuterLoops;
-  std::vector<BinaryLoop *> InnerLoops;
+
+  // get outer most loops in the function
   for (auto I = BF.BLI->begin(), E = BF.BLI->end(); I != E; ++I) {
     OuterLoops.push_back(*I);
     ++BF.BLI->OuterLoops;
   }
 
-  llvm::outs()<<"@@@@@ number of outer loops: "<<BF.BLI->OuterLoops<<"\n";
-
+  std::vector<BinaryLoop*> LoopsContainTopLLCMissBB;
   while (!OuterLoops.empty()) {
     BinaryLoop *L = OuterLoops.back();
     OuterLoops.pop_back();
-    InnerLoops.clear();
+
     ++BF.BLI->TotalLoops;
     BF.BLI->MaximumDepth = std::max(L->getLoopDepth(), BF.BLI->MaximumDepth);
 
-    // get nested loops.
-    for (BinaryLoop::iterator I = L->begin(), E = L->end(); I != E; ++I)
-      InnerLoops.push_back(*I);
-
-    // Compute back edge count.
-    SmallVector<BinaryBasicBlock *, 1> Latches;
-    L->getLoopLatches(Latches);
-    llvm::outs()<<"@@@@@ number of inner loops: "<< InnerLoops.size()<<"\n";
-    for(BinaryBasicBlock *BB : L->getBlocks()){
+    bool containTopLLCMissBB = false;
+    for (BinaryBasicBlock *BB : L->getBlocks()){
       if (BB==TopLLCMissBB){
-        llvm::outs()<<"hhhhh\n";
+        containTopLLCMissBB = true;
+        LoopsContainTopLLCMissBB.push_back(L);
+        OuterLoops.clear();
+        break;    
       }
-    }    
+    }  
+
+    // get inner loops of the current outer loop.
+    // set these inner loops to be the new round 
+    // of outer loops
+    if (containTopLLCMissBB){
+      for (BinaryLoop::iterator I = L->begin(), E = L->end(); I != E; ++I){
+        OuterLoops.push_back(*I);
+      }
+    } 
   }
+
+  int LoopDepth = (int)LoopsContainTopLLCMissBB.size();
+  llvm::outs()<<"[InjectPrefetchPass] the depth of nested Loop that contains TopLLCMissBB is "<<LoopDepth<<"\n";
+
+  // if the top LLC miss instruction doesn't exist in 
+  // a nested loop, we are not going to inject prefetch
+  if (LoopDepth<2) return false;
+
+  BinaryLoop* OuterLoop = LoopsContainTopLLCMissBB[LoopDepth-2];
+  BinaryLoop* InnerLoop = LoopsContainTopLLCMissBB[LoopDepth-1];
+
+  SmallVector<BinaryBasicBlock *, 1> Latches;
+  OuterLoop->getLoopLatches(Latches);
+  llvm::outs()<<"[InjectPrefetchPass] number of latches in the outer loop: "<< Latches.size()<<"\n";
+
+  // if the loop doesn't contain latch, return false
+  if (Latches.size()==0) return false;
+
+  BinaryBasicBlock *HeaderBB = OuterLoop->getHeader();
+  for (auto I = HeaderBB->begin(); I != HeaderBB->end(); I++) {
+    const MCInst &Instr = *I;
+    if (BC.MIB->hasAnnotation(Instr, "AbsoluteAddr")){
+      uint64_t AbsoluteAddr = (uint64_t)BC.MIB->getAnnotationAs<uint64_t>(Instr, "AbsoluteAddr");        
+      llvm::outs()<<"[InjectPrefetchPass] header: "<<utohexstr(AbsoluteAddr)<<"\n";
+    } 
+  } 
+
+  for (auto I = Latches[0]->begin(); I != Latches[0]->end(); I++) {
+    const MCInst &Instr = *I;
+    if (BC.MIB->hasAnnotation(Instr, "AbsoluteAddr")){
+      uint64_t AbsoluteAddr = (uint64_t)BC.MIB->getAnnotationAs<uint64_t>(Instr, "AbsoluteAddr");        
+      llvm::outs()<<"[InjectPrefetchPass] latch: "<<utohexstr(AbsoluteAddr)<<"\n";
+    } 
+  } 
+
+  // Now we have both the loop header and the latch
+  // In the loop header, we need to inject prefetch instruction 
+ 
 
 /*
   for (BinaryBasicBlock *BB : BF.layout()) {
@@ -158,8 +199,6 @@ void InjectPrefetchPass::runOnFunctions(BinaryContext &BC) {
 //  if (opts::ReorderBlocks == ReorderBasicBlocks::LT_NONE ||
 //      opts::LoopReorder == false)
 //    return;
-
-  llvm::errs()<<"hhhhhhhhhhhhhhh\n";
 
   ParallelUtilities::WorkFuncTy WorkFun = [&](BinaryFunction &BF) {
     llvm::errs()<<"iiiiiiiiiiiiiiii\n";
