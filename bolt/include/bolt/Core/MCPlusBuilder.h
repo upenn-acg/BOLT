@@ -1490,6 +1490,11 @@ public:
     return false;
   }
 
+  virtual bool createPrefetchT0(MCInst &Inst, const MCPhysReg &Reg) const {
+    llvm_unreachable("not implemented");
+    return false; 
+  }
+
   /// Creates a call frame pseudo instruction. A single operand identifies which
   /// MCCFIInstruction this MCInst is referring to.
   ///
