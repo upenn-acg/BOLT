@@ -48,25 +48,15 @@ bool InjectPrefetchPass::runOnFunction(BinaryFunction &BF) {
   llvm::outs()<<"[InjectPrefetchPass] The number of Insn in do_work is: "
               <<InstrWithAddr.size()<<"\n";
 
-  MCInst* TopLLCMissInsn;  
-  for (auto it = InstrWithAddr.begin(); it !=InstrWithAddr.end(); it++){
-    llvm::outs()<<"@@@ "<<utohexstr(it->first)<<"\n";
-    
-    if (it->first == 0x401520){
-      llvm::outs()<<"[InjectPrefetchPass] find the MCInst of top LLC miss instruction\n";
-    }
-  }
-
   for (auto BBI = BF.begin(); BBI != BF.end(); BBI ++){
     BinaryBasicBlock &BB = *BBI;
     for (auto It = BB.begin(); It != BB.end(); It++){
-      const MCInst &Inst = *It;
-      if (BC.MIB->hasAnnotation(Inst, "Offset")){
-//        auto addr = BC.MIB->getAnnotationAs<uint64_t>(Inst, "AbsoluteAddr");
-//        llvm::outs()<<utohexstr(addr)<<"\n";
-
+      const MCInst &Instr = *It;
+      if (BC.MIB->hasAnnotation(Instr, "AbsoluteAddr")){
+        auto AbsoluteAddr = BC.MIB->getAnnotationAs<uint64_t>(Instr, "AbsoluteAddr");        
+        long tmp = (long)AbsoluteAddr; 
+        llvm::outs()<<"@@@ "<<utohexstr((long)tmp)<<"\n";
       }
-      
     }
   }
 

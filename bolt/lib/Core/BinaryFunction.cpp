@@ -1234,7 +1234,8 @@ bool BinaryFunction::disassemble() {
 
     // zyuxuan
     if (this->getOneName()=="_Z7do_workPv"){ 
-      InstructionWithAddr.insert(std::make_pair(AbsoluteInstrAddr, &Instruction));
+      MIB->addAnnotation(Instruction, "AbsoluteAddr", static_cast<uint64_t>(AbsoluteInstrAddr));
+//      InstructionWithAddr.insert(std::make_pair(AbsoluteInstrAddr, &Instruction));
     }
     // Check integrity of LLVM assembler/disassembler.
     if (opts::CheckEncoding && !BC.MIB->isBranch(Instruction) &&

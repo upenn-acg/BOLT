@@ -318,7 +318,7 @@ void BinaryFunctionPassManager::runAllPasses(BinaryContext &BC) {
   BinaryFunctionPassManager Manager(BC);
 
   const DynoStats InitialDynoStats = getDynoStats(BC.getBinaryFunctions());
-
+/*
   Manager.registerPass(std::make_unique<AsmDumpPass>(),
                        opts::AsmDump.getNumOccurrences());
 
@@ -479,7 +479,7 @@ void BinaryFunctionPassManager::runAllPasses(BinaryContext &BC) {
     Manager.registerPass(std::make_unique<CheckLargeFunctions>(NeverPrint));
 
   Manager.registerPass(std::make_unique<LowerAnnotations>(NeverPrint));
-
+*/
   Manager.registerPass(std::make_unique<InjectPrefetchPass>());
 
 
