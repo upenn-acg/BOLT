@@ -1232,10 +1232,10 @@ bool BinaryFunction::disassemble() {
       break;
     }
 
-    // zyuxuan: need this annotation for the InjectPrefetch Pass
-    llvm::outs()<<"@@@@@@ BinaryFunction\n";
-    MIB->addAnnotation(Instruction, "AbsoluteAddr", static_cast<uint64_t>(AbsoluteInstrAddr));
-
+    // zyuxuan
+    if (this->getOneName()=="_Z7do_workPv"){ 
+      InstructionWithAddr.insert(std::make_pair(AbsoluteInstrAddr, &Instruction));
+    }
     // Check integrity of LLVM assembler/disassembler.
     if (opts::CheckEncoding && !BC.MIB->isBranch(Instruction) &&
         !BC.MIB->isCall(Instruction) && !BC.MIB->isNoop(Instruction)) {

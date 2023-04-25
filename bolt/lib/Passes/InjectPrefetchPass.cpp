@@ -12,6 +12,7 @@
 
 #include "bolt/Passes/InjectPrefetchPass.h"
 #include "bolt/Core/ParallelUtilities.h"
+#include <unordered_map>
 
 using namespace llvm;
 
@@ -39,14 +40,28 @@ bool InjectPrefetchPass::runOnFunction(BinaryFunction &BF) {
   // get the Basic Block that contains the TOP LLC miss
   // instruction. 
   BinaryContext& BC = BF.getBinaryContext();
+  std::unordered_map<uint64_t, MCInst* > InstrWithAddr = BF.InstructionWithAddr;
   uint64_t startingAddr = BF.getAddress();
-  llvm::outs()<<"### The starting address of do_work is: 0x"<<utohexstr(startingAddr)<<"\n";
+
+  llvm::outs()<<"[InjectPrefetchPass] The starting address of do_work is: 0x"
+              <<utohexstr(startingAddr)<<"\n";
+  llvm::outs()<<"[InjectPrefetchPass] The number of Insn in do_work is: "
+              <<InstrWithAddr.size()<<"\n";
+
+  MCInst* TopLLCMissInsn;  
+  for (auto it = InstrWithAddr.begin(); it !=InstrWithAddr.end(); it++){
+    llvm::outs()<<"@@@ "<<utohexstr(it->first)<<"\n";
+    
+    if (it->first == 0x401520){
+      llvm::outs()<<"[InjectPrefetchPass] find the MCInst of top LLC miss instruction\n";
+    }
+  }
+
   for (auto BBI = BF.begin(); BBI != BF.end(); BBI ++){
     BinaryBasicBlock &BB = *BBI;
     for (auto It = BB.begin(); It != BB.end(); It++){
       const MCInst &Inst = *It;
       if (BC.MIB->hasAnnotation(Inst, "Offset")){
-        llvm::outs()<<"kkkkkkk\n";
 //        auto addr = BC.MIB->getAnnotationAs<uint64_t>(Inst, "AbsoluteAddr");
 //        llvm::outs()<<utohexstr(addr)<<"\n";
 

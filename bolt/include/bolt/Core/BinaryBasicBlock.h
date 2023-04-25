@@ -24,6 +24,7 @@
 #include "llvm/Support/raw_ostream.h"
 #include <limits>
 #include <utility>
+#include <unordered_map>
 
 namespace llvm {
 class MCCodeEmitter;
