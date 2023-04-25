@@ -458,10 +458,10 @@ void BinaryFunctionPassManager::runAllPasses(BinaryContext &BC) {
 
   Manager.registerPass(
       std::make_unique<RetpolineInsertion>(PrintRetpolineInsertion));
-
+*/
   // Assign each function an output section.
   Manager.registerPass(std::make_unique<AssignSections>());
-
+/*
   // Patch original function entries
   if (BC.HasRelocations)
     Manager.registerPass(std::make_unique<PatchEntries>());

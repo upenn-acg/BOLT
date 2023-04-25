@@ -37,32 +37,33 @@ bool InjectPrefetchPass::runOnFunction(BinaryFunction &BF) {
 
   if (BF.getOneName() != "_Z7do_workPv") return false;
 
-  // get the Basic Block that contains the TOP LLC miss
-  // instruction. 
   BinaryContext& BC = BF.getBinaryContext();
-  std::unordered_map<uint64_t, MCInst* > InstrWithAddr = BF.InstructionWithAddr;
   uint64_t startingAddr = BF.getAddress();
 
   llvm::outs()<<"[InjectPrefetchPass] The starting address of do_work is: 0x"
               <<utohexstr(startingAddr)<<"\n";
-  llvm::outs()<<"[InjectPrefetchPass] The number of Insn in do_work is: "
-              <<InstrWithAddr.size()<<"\n";
+
+
+  // get the Basic Block that contains the TOP LLC miss
+  // instruction. 
+  BinaryBasicBlock* TopLLCMissBB;
 
   for (auto BBI = BF.begin(); BBI != BF.end(); BBI ++){
     BinaryBasicBlock &BB = *BBI;
     for (auto It = BB.begin(); It != BB.end(); It++){
       const MCInst &Instr = *It;
       if (BC.MIB->hasAnnotation(Instr, "AbsoluteAddr")){
-        auto AbsoluteAddr = BC.MIB->getAnnotationAs<uint64_t>(Instr, "AbsoluteAddr");        
-        long tmp = (long)AbsoluteAddr; 
-        llvm::outs()<<"@@@ "<<utohexstr((long)tmp)<<"\n";
+        uint64_t AbsoluteAddr = (uint64_t)BC.MIB->getAnnotationAs<uint64_t>(Instr, "AbsoluteAddr");        
+        //llvm::outs()<<"@@@ "<<utohexstr((long)AbsoluteAddr)<<"\n";
+        if (AbsoluteAddr == 0x401520){
+          llvm::outs()<<"[InjectPrefetchPass] find instruction that causes the TOP LLC miss\n";
+          TopLLCMissBB = &BB;
+        }
       }
     }
   }
 
-
-
-
+  // get loops in the function
   BF.updateLayoutIndices();
 
   BinaryDominatorTree DomTree;
@@ -95,10 +96,12 @@ bool InjectPrefetchPass::runOnFunction(BinaryFunction &BF) {
     L->getLoopLatches(Latches);
     llvm::outs()<<"@@@@@ number of inner loops: "<< InnerLoops.size()<<"\n";
     for(BinaryBasicBlock *BB : L->getBlocks()){
-      printf("xxxxxx\n");
+      if (BB==TopLLCMissBB){
+        llvm::outs()<<"hhhhh\n";
+      }
     }    
-
   }
+
 /*
   for (BinaryBasicBlock *BB : BF.layout()) {
     if (BB->succ_size() != 1 || BB->pred_size() != 1)
