@@ -33,21 +33,30 @@ namespace llvm {
 namespace bolt {
 
 bool InjectPrefetchPass::runOnFunction(BinaryFunction &BF) {
+
+  if (BF.getOneName() != "_Z7do_workPv") return false;
+
   // get the Basic Block that contains the TOP LLC miss
   // instruction. 
   BinaryContext& BC = BF.getBinaryContext();
-
-  for (auto BB = BF.begin(); BB != BF.end(); BB++){
-    for (auto It = BB->begin(); It != BB->end(); It++){
-      llvm::outs()<<"##### \n";
-      if (BC.MIB->hasAnnotation(*It, "Offset")){
+  uint64_t startingAddr = BF.getAddress();
+  llvm::outs()<<"### The starting address of do_work is: 0x"<<utohexstr(startingAddr)<<"\n";
+  for (auto BBI = BF.begin(); BBI != BF.end(); BBI ++){
+    BinaryBasicBlock &BB = *BBI;
+    for (auto It = BB.begin(); It != BB.end(); It++){
+      const MCInst &Inst = *It;
+      if (BC.MIB->hasAnnotation(Inst, "Offset")){
         llvm::outs()<<"kkkkkkk\n";
+//        auto addr = BC.MIB->getAnnotationAs<uint64_t>(Inst, "AbsoluteAddr");
+//        llvm::outs()<<utohexstr(addr)<<"\n";
+
       }
+      
     }
   }
 
 
-  if (BF.getOneName() != "_Z7do_workPv") return false;
+
 
   BF.updateLayoutIndices();
 

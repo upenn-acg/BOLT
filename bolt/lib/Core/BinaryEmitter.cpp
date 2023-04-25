@@ -475,6 +475,10 @@ void BinaryEmitter::emitFunctionBody(BinaryFunction &BF, bool EmitColdPart,
         BB->getLocSyms().emplace_back(Offset, LocSym);
       }
 
+      if (BC.MIB->hasAnnotation(Instr, "Size")){
+         llvm::outs()<<"@@@@@@@@@@ In EmitFunction\n";
+      }
+
       Streamer.emitInstruction(Instr, *BC.STI);
       LastIsPrefix = BC.MIB->isPrefix(Instr);
     }
