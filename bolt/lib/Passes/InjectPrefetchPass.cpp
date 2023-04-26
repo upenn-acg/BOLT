@@ -131,6 +131,19 @@ bool InjectPrefetchPass::runOnFunction(BinaryFunction &BF) {
     } 
   } 
 
+  auto Loc = HeaderBB->begin();
+  MCInst PushInst; 
+  //BC.MIB->createPrefetchT0(NewInst, BC.MIB->getX86RAX());
+  BC.MIB->createPushRegister(PushInst, BC.MIB->getX86RAX(), 8);
+  Loc = HeaderBB->insertRealInstruction(Loc, PushInst);
+  Loc++;  
+
+  MCInst PopInst; 
+  BC.MIB->createPopRegister(PopInst, BC.MIB->getX86RAX(), 8);
+  HeaderBB->insertRealInstruction(Loc, PopInst);
+
+
+
   for (auto I = Latches[0]->begin(); I != Latches[0]->end(); I++) {
     const MCInst &Instr = *I;
     if (BC.MIB->hasAnnotation(Instr, "AbsoluteAddr")){

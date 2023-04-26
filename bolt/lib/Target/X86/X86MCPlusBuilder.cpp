@@ -3223,6 +3223,8 @@ public:
   }
 
   MCPhysReg getX86R11() const override { return X86::R11; }
+   
+  MCPhysReg getX86RAX() const override { return X86::RAX; }
 
   MCPhysReg getNoRegister() const override { return X86::NoRegister; }
 

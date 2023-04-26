@@ -750,6 +750,10 @@ public:
     return Instructions.insert(At, NewInst);
   }
 
+  iterator insertRealInstruction(iterator At, MCInst &NewInst) {
+    return Instructions.insert(At, NewInst);
+  }
+
   /// Helper to retrieve any terminators in \p BB before \p Pos. This is used
   /// to skip CFI instructions and to retrieve the first terminator instruction
   /// in basic blocks with two terminators (conditional jump and unconditional
