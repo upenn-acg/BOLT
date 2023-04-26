@@ -418,6 +418,11 @@ public:
 
   virtual MCPhysReg getX86RAX() const { llvm_unreachable("not implemented"); }
 
+  virtual MCPhysReg getX86RDX() const { llvm_unreachable("not implemented"); }
+
+  virtual MCPhysReg getX86R9() const { llvm_unreachable("not implemented"); }
+
+
   /// Create increment contents of target by 1 for Instrumentation
   virtual void createInstrIncMemory(InstructionListType &Instrs,
                                     const MCSymbol *Target, MCContext *Ctx,

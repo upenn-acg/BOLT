@@ -47,16 +47,29 @@ bool InjectPrefetchPass::runOnFunction(BinaryFunction &BF) {
   // get the Basic Block that contains the TOP LLC miss
   // instruction. 
   BinaryBasicBlock* TopLLCMissBB;
+  MCInst* TopLLCMissInstr;
+  MCInst* DemandLoadInstr;
 
   for (auto BBI = BF.begin(); BBI != BF.end(); BBI ++){
     BinaryBasicBlock &BB = *BBI;
     for (auto It = BB.begin(); It != BB.end(); It++){
-      const MCInst &Instr = *It;
+      MCInst &Instr = *It;
       if (BC.MIB->hasAnnotation(Instr, "AbsoluteAddr")){
         uint64_t AbsoluteAddr = (uint64_t)BC.MIB->getAnnotationAs<uint64_t>(Instr, "AbsoluteAddr");        
         if (AbsoluteAddr == 0x401520){
           llvm::outs()<<"[InjectPrefetchPass] find instruction that causes the TOP LLC miss\n";
+          if (BC.MIB->isLoad(Instr)){
+           llvm::outs()<<"[InjectPrefetchPass] TOP LLC miss instruction is a load\n";           
+          }  
           TopLLCMissBB = &BB;
+          TopLLCMissInstr = &Instr;
+        }
+        else if (AbsoluteAddr == 0x40150a){
+          llvm::outs()<<"[InjectPrefetchPass] find demand load instr\n"; 
+          if (BC.MIB->isLoad(Instr)){
+           llvm::outs()<<"[InjectPrefetchPass] 'demand load' is a load\n";           
+          }  
+          DemandLoadInstr = &Instr;
         }
       }
     }
@@ -119,9 +132,9 @@ bool InjectPrefetchPass::runOnFunction(BinaryFunction &BF) {
   OuterLoop->getLoopLatches(Latches);
   llvm::outs()<<"[InjectPrefetchPass] number of latches in the outer loop: "<< Latches.size()<<"\n";
 
-  // if the loop doesn't contain latch, return false
-  if (Latches.size()==0) return false;
-
+  // get the loop header and check if the header is in
+  // the loop we want
+  // we are going to insert prefetch to the header basic block
   BinaryBasicBlock *HeaderBB = OuterLoop->getHeader();
   for (auto I = HeaderBB->begin(); I != HeaderBB->end(); I++) {
     const MCInst &Instr = *I;
@@ -131,18 +144,47 @@ bool InjectPrefetchPass::runOnFunction(BinaryFunction &BF) {
     } 
   } 
 
+  // Now we have the loop header
+  // In the loop header, we need to inject prefetch instruction 
+  // first Push %rax 
   auto Loc = HeaderBB->begin();
   MCInst PushInst; 
-  //BC.MIB->createPrefetchT0(NewInst, BC.MIB->getX86RAX());
   BC.MIB->createPushRegister(PushInst, BC.MIB->getX86RAX(), 8);
   Loc = HeaderBB->insertRealInstruction(Loc, PushInst);
   Loc++;  
 
+  // then load prefetch target's address
+  Loc = HeaderBB->insertRealInstruction(Loc, *DemandLoadInstr);
+  Loc++;  
+
+/*
+  MCInst PrefetchInst;
+  BC.MIB->createPrefetchT0(PrefetchInst, BC.MIB->getX86RAX());
+  Loc = HeaderBB->insertRealInstruction(Loc, PrefetchInst);
+  Loc++;  
+*/
+
+  // finally pop %rax
   MCInst PopInst; 
   BC.MIB->createPopRegister(PopInst, BC.MIB->getX86RAX(), 8);
   HeaderBB->insertRealInstruction(Loc, PopInst);
 
+  // top llc miss insn
+  int numOperands = TopLLCMissInstr->getNumOperands();
+  std::vector<MCOperand*> Operands;
+  llvm::outs()<<"[InjectPrefetchPass] number of operands is: "<<numOperands<<"\n";
+  for (int i = 0; i < numOperands; i++){
+    MCOperand oprd = TopLLCMissInstr->getOperand(i);
+    if (oprd.isReg()){
+      unsigned regNum = oprd.getReg();
+      llvm::outs()<<"@@@ "<<regNum<<"\n";
+    }
+  }
 
+  /*------------------no use code-----------------*/
+  // if the loop doesn't contain latch, return false
+  /*
+  if (Latches.size()==0) return false;
 
   for (auto I = Latches[0]->begin(); I != Latches[0]->end(); I++) {
     const MCInst &Instr = *I;
@@ -152,11 +194,9 @@ bool InjectPrefetchPass::runOnFunction(BinaryFunction &BF) {
     } 
   } 
 
-  // Now we have both the loop header and the latch
-  // In the loop header, we need to inject prefetch instruction 
- 
 
-/*
+
+
   for (BinaryBasicBlock *BB : BF.layout()) {
     if (BB->succ_size() != 1 || BB->pred_size() != 1)
       continue;
@@ -206,31 +246,6 @@ void InjectPrefetchPass::runOnFunctions(BinaryContext &BC) {
    for (auto &it: BC.getBinaryFunctions()){
       runOnFunction(it.second);
    }
-
-/*
-  std::atomic<uint64_t> ModifiedFuncCount{0};
-//  if (opts::ReorderBlocks == ReorderBasicBlocks::LT_NONE ||
-//      opts::LoopReorder == false)
-//    return;
-
-  ParallelUtilities::WorkFuncTy WorkFun = [&](BinaryFunction &BF) {
-    llvm::errs()<<"iiiiiiiiiiiiiiii\n";
-    if (runOnFunction(BF))
-      ++ModifiedFuncCount;
-  };
-
-  ParallelUtilities::PredicateTy SkipFunc = [&](const BinaryFunction &BF) {
-//    return !shouldOptimize(BF);
-    return true;
-  };
-
-  ParallelUtilities::runOnEachFunction(
-      BC, ParallelUtilities::SchedulingPolicy::SP_TRIVIAL, WorkFun, SkipFunc,
-      "InjectPrefetchPass");
-
-  outs() << "BOLT-INFO: " << ModifiedFuncCount
-         << " Functions were reordered by InjectPrefetchPass\n";
-*/
 }
 
 } // end namespace bolt

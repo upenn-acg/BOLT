@@ -3226,6 +3226,10 @@ public:
    
   MCPhysReg getX86RAX() const override { return X86::RAX; }
 
+  MCPhysReg getX86RDX() const override { return X86::RDX; }
+
+  MCPhysReg getX86R9() const override { return X86::R9; }
+
   MCPhysReg getNoRegister() const override { return X86::NoRegister; }
 
   MCPhysReg getIntArgRegister(unsigned ArgNo) const override {
