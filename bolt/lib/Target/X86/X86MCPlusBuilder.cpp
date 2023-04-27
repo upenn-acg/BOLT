@@ -2741,7 +2741,15 @@ public:
     Inst.addOperand(MCOperand::createReg(Reg));
     return true;
   }
-
+/*
+  bool createPrefetchT0(MCInst &Inst, const MCPhysReg &Reg, 
+                        const MCPhysReg &AddrSegmentReg) const override {
+    Inst.setOpcode(X86::PREFETCHT0);
+    Inst.addOperand(MCOperand::createReg(Reg));
+    Inst.addOperand(MCOperand::createReg(AddrSegmentReg));
+    return true;
+  }
+*/
 
 
   InstructionListType createInlineMemcpy(bool ReturnEnd) const override {
