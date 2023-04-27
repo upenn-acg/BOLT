@@ -352,6 +352,16 @@ public:
     return false;
   }
 
+  bool isPrefetchT0(const MCInst &Inst) const override {
+    switch (Inst.getOpcode()) {
+    case X86::PREFETCHT0:
+      return true;
+    }
+    return false;
+  }
+
+
+
   unsigned getCondCode(const MCInst &Inst) const override {
     switch (Inst.getOpcode()) {
     default:
@@ -2736,21 +2746,20 @@ public:
     return true;
   }
 
-  bool createPrefetchT0(MCInst &Inst, const MCPhysReg &Reg) const override {
-    Inst.setOpcode(X86::PREFETCHT0);
-    Inst.addOperand(MCOperand::createReg(Reg));
-    return true;
-  }
-/*
-  bool createPrefetchT0(MCInst &Inst, const MCPhysReg &Reg, 
-                        const MCPhysReg &AddrSegmentReg) const override {
-    Inst.setOpcode(X86::PREFETCHT0);
-    Inst.addOperand(MCOperand::createReg(Reg));
-    Inst.addOperand(MCOperand::createReg(AddrSegmentReg));
-    return true;
-  }
-*/
+  bool createPrefetchT0(MCInst &Inst, const MCPhysReg &DstReg,
+                                int Offset, const MCPhysReg &BaseReg,
+                                int Scale, const MCPhysReg &AddrSegmentReg,
+                                const MCInst &Inst0) const override {
 
+    Inst.setOpcode(X86::PREFETCHT0);
+    Inst.addOperand(MCOperand::createReg(DstReg));
+    Inst.addOperand(MCOperand::createImm(Scale));
+    Inst.addOperand(MCOperand::createReg(BaseReg));
+    Inst.addOperand(MCOperand::createImm(Offset));
+    Inst.addOperand(MCOperand::createReg(AddrSegmentReg));
+    Inst.addOperand(MCOperand::createImm(0));
+    return true;
+  } 
 
   InstructionListType createInlineMemcpy(bool ReturnEnd) const override {
     InstructionListType Code;

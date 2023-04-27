@@ -197,14 +197,12 @@ bool InjectPrefetchPass::runOnFunction(BinaryFunction &BF) {
   Loc = HeaderBB->insertRealInstruction(Loc, LoadPrefetchAddrInstr);
   Loc++;  
 
-/*
+
   MCInst PrefetchInst;
-//  MCPhysReg AddrSegmentReg = LoadPrefetchAddrInstr.getOperand(6).getReg();
-//  BC.MIB->createPrefetchT0(PrefetchInst, BC.MIB->getX86RAX(), BC.MIB->getNoRegister());
-  BC.MIB->createPrefetchT0(PrefetchInst, BC.MIB->getX86RAX());
+  BC.MIB->createPrefetchT0(PrefetchInst, BC.MIB->getX86RAX(), 0, BC.MIB->getNoRegister(), 0, BC.MIB->getNoRegister(), LoadPrefetchAddrInstr);
   Loc = HeaderBB->insertRealInstruction(Loc, PrefetchInst);
   Loc++;  
-*/
+
 
   // finally pop %rax
   MCInst PopInst; 

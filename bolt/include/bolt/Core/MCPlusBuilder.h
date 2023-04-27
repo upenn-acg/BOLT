@@ -467,6 +467,11 @@ public:
     return false;
   }
 
+  virtual bool isPrefetchT0(const MCInst &Inst) const {
+    llvm_unreachable("not implemented");
+    return false;
+  }
+
   virtual bool isBreakpoint(const MCInst &Inst) const {
     llvm_unreachable("not implemented");
     return false;
@@ -1497,17 +1502,13 @@ public:
     return false;
   }
 
-  virtual bool createPrefetchT0(MCInst &Inst, const MCPhysReg &Reg) const {
+  virtual bool createPrefetchT0(MCInst &Inst, const MCPhysReg &DstReg,
+                                int Offset, const MCPhysReg &BaseReg, 
+                                int Scale, const MCPhysReg &AddrSegmentReg, 
+                                const MCInst &Inst0) const {
     llvm_unreachable("not implemented");
     return false; 
   }
-/*
-  virtual bool createPrefetchT0(MCInst &Inst, const MCPhysReg &Reg, 
-                                const MCPhysReg &AddrSegmentReg) const {
-    llvm_unreachable("not implemented");
-    return false; 
-  }
-*/
 
   /// Creates a call frame pseudo instruction. A single operand identifies which
   /// MCCFIInstruction this MCInst is referring to.
