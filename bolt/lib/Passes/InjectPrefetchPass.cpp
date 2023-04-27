@@ -44,8 +44,8 @@ bool InjectPrefetchPass::runOnFunction(BinaryFunction &BF) {
               <<utohexstr(startingAddr)<<"\n";
 
 
-  // get the Basic Block that contains the TOP LLC miss
-  // instruction. 
+  // get the Instruction and Basic Block that contains 
+  // the TOP LLC miss instruction. 
   BinaryBasicBlock* TopLLCMissBB;
   MCInst* TopLLCMissInstr;
   MCInst* DemandLoadInstr;
@@ -59,22 +59,23 @@ bool InjectPrefetchPass::runOnFunction(BinaryFunction &BF) {
         if (AbsoluteAddr == 0x401520){
           llvm::outs()<<"[InjectPrefetchPass] find instruction that causes the TOP LLC miss\n";
           if (BC.MIB->isLoad(Instr)){
-           llvm::outs()<<"[InjectPrefetchPass] TOP LLC miss instruction is a load\n";           
+            llvm::outs()<<"[InjectPrefetchPass] TOP LLC miss instruction is a load\n";           
+          }
+          else if (BC.MIB->isStore(Instr)){
+            llvm::outs()<<"[InjectPrefetchPass] TOP LLC miss instruction is a store\n";
+          }
+          else {
+            return false;
           }  
           TopLLCMissBB = &BB;
           TopLLCMissInstr = &Instr;
-        }
-        else if (AbsoluteAddr == 0x40150a){
-          llvm::outs()<<"[InjectPrefetchPass] find demand load instr\n"; 
-          if (BC.MIB->isLoad(Instr)){
-           llvm::outs()<<"[InjectPrefetchPass] 'demand load' is a load\n";           
-          }  
-          DemandLoadInstr = &Instr;
         }
       }
     }
   }
 
+
+  // get loop info of this function
   BF.updateLayoutIndices();
 
   BinaryDominatorTree DomTree;
@@ -123,14 +124,37 @@ bool InjectPrefetchPass::runOnFunction(BinaryFunction &BF) {
 
   // if the top LLC miss instruction doesn't exist in 
   // a nested loop, we are not going to inject prefetch
-  if (LoopDepth<2) return false;
+  if (LoopDepth < 2) return false;
 
   BinaryLoop* OuterLoop = LoopsContainTopLLCMissBB[LoopDepth-2];
   BinaryLoop* InnerLoop = LoopsContainTopLLCMissBB[LoopDepth-1];
 
-  SmallVector<BinaryBasicBlock *, 1> Latches;
-  OuterLoop->getLoopLatches(Latches);
-  llvm::outs()<<"[InjectPrefetchPass] number of latches in the outer loop: "<< Latches.size()<<"\n";
+
+  std::vector<MCInst* > Loads;
+  for (BinaryBasicBlock *BB : OuterLoop->getBlocks()){
+    for (auto It = BB->begin(); It != BB->end(); It++){
+      MCInst &Instr = *It;
+      if (BC.MIB->isLoad(Instr)){
+        Loads.push_back(&Instr);
+      }
+    }
+  }  
+
+  // based on TopLLCMissInstr, decide the DemandLoadInstr
+  unsigned DemandLoadDstRegNum = TopLLCMissInstr->getOperand(1).getReg();
+  std::vector<MCInst* >DemandLoads;
+  for (unsigned i=0; i<Loads.size(); i++){
+    if (Loads[i]->getOperand(0).getReg()==DemandLoadDstRegNum){
+      DemandLoads.push_back(Loads[i]);
+      uint64_t AbsoluteAddr = (uint64_t)BC.MIB->getAnnotationAs<uint64_t>(*Loads[i], "AbsoluteAddr"); 
+      llvm::outs()<<"[InjectPrefetchPass] addr: "<<utohexstr(AbsoluteAddr)<<"\n";
+    } 
+  }
+  if (DemandLoads.size()!=1){
+    llvm::outs()<<"[InjectPrefetchPass][err] the number of potential Demand Load is "<<DemandLoads.size()<<"\n";
+    return false;
+  }
+  DemandLoadInstr = DemandLoads[0];
 
   // get the loop header and check if the header is in
   // the loop we want
@@ -154,7 +178,23 @@ bool InjectPrefetchPass::runOnFunction(BinaryFunction &BF) {
   Loc++;  
 
   // then load prefetch target's address
-  Loc = HeaderBB->insertRealInstruction(Loc, *DemandLoadInstr);
+  int numOperands = DemandLoadInstr->getNumOperands();
+  MCInst LoadPrefetchAddrInstr;
+  LoadPrefetchAddrInstr.setOpcode(DemandLoadInstr->getOpcode());
+  for (int i=0; i<numOperands; i++){
+     if (i==0){
+       // the first operand is the dest reg
+       LoadPrefetchAddrInstr.addOperand(MCOperand::createReg(BC.MIB->getX86RAX())); 
+     }
+     else if (i==4){
+       // the 5th operand is the offset
+       LoadPrefetchAddrInstr.addOperand(MCOperand::createImm(512));
+     }
+     else{
+       LoadPrefetchAddrInstr.addOperand(DemandLoadInstr->getOperand(i));
+     }
+  }
+  Loc = HeaderBB->insertRealInstruction(Loc, LoadPrefetchAddrInstr);
   Loc++;  
 
 /*
@@ -170,8 +210,9 @@ bool InjectPrefetchPass::runOnFunction(BinaryFunction &BF) {
   HeaderBB->insertRealInstruction(Loc, PopInst);
 
   // top llc miss insn
-  int numOperands = TopLLCMissInstr->getNumOperands();
-  std::vector<MCOperand*> Operands;
+/*
+  numOperands = TopLLCMissInstr->getNumOperands();
+  std::vector<MCOperand> Operands;
   llvm::outs()<<"[InjectPrefetchPass] number of operands is: "<<numOperands<<"\n";
   for (int i = 0; i < numOperands; i++){
     MCOperand oprd = TopLLCMissInstr->getOperand(i);
@@ -179,11 +220,21 @@ bool InjectPrefetchPass::runOnFunction(BinaryFunction &BF) {
       unsigned regNum = oprd.getReg();
       llvm::outs()<<"@@@ "<<regNum<<"\n";
     }
+    else if (oprd.isImm()){
+      unsigned immNum = oprd.getImm();
+      llvm::outs()<<"### "<<immNum<<"\n";
+    }
   }
+*/
 
   /*------------------no use code-----------------*/
   // if the loop doesn't contain latch, return false
   /*
+
+  SmallVector<BinaryBasicBlock *, 1> Latches;
+  OuterLoop->getLoopLatches(Latches);
+  llvm::outs()<<"[InjectPrefetchPass] number of latches in the outer loop: "<< Latches.size()<<"\n";
+
   if (Latches.size()==0) return false;
 
   for (auto I = Latches[0]->begin(); I != Latches[0]->end(); I++) {
