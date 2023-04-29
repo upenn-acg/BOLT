@@ -476,17 +476,17 @@ void BinaryEmitter::emitFunctionBody(BinaryFunction &BF, bool EmitColdPart,
       }
 
       if (BC.MIB->isPrefetchT0(Instr)){
-         llvm::outs()<<"@@@@@@  A prefetch!\n";
+         llvm::outs()<<"######  A prefetch!\n";
          llvm::outs()<<"num of operands: "<<Instr.getNumOperands()<<"\n";
-         for (int i=0; i<Instr.getNumOperands(); i++){
+         for (unsigned i=0; i<Instr.getNumOperands(); i++){
             if (Instr.getOperand(i).isImm()){
-               llvm::outs()<<"@@@ a imm\n";
+               llvm::outs()<<"### a imm\n";
             }
             else if (Instr.getOperand(i).isReg()){
-               llvm::outs()<<"@@@ a reg\n";
+               llvm::outs()<<"### a reg\n";
             }
             else if (Instr.getOperand(i).isInst()){
-               llvm::outs()<<"@@@ a inst\n";
+               llvm::outs()<<"### a inst\n";
             }
          }
       }

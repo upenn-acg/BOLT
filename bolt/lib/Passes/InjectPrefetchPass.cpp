@@ -17,17 +17,23 @@
 using namespace llvm;
 
 namespace opts {
-/*
+
 extern cl::OptionCategory BoltCategory;
 
-extern cl::opt<bolt::ReorderBasicBlocks::LayoutType> ReorderBlocks;
+//extern cl::opt<bolt::ReorderBasicBlocks::LayoutType> ReorderBlocks;
 
 
-static cl::opt<bool> LoopReorder(
-    "loop-inversion-opt",
-    cl::desc("reorder unconditional jump instructions in loops optimization"),
-    cl::init(true), cl::cat(BoltCategory), cl::ReallyHidden);
-*/
+static cl::opt<bool> InjectPrefetch(
+    "inject-prefetch",
+    cl::desc("inject prefetch to load that has the highest LLC miss in a nested loop"),
+    cl::init(false), cl::cat(BoltCategory), cl::ReallyHidden);
+
+static cl::opt<std::string>
+PrefetchLocationFile("prefetech-location-file",
+  cl::desc("file that contains top LLC miss location"),
+  cl::Hidden,
+  cl::cat(BoltCategory));
+
 } // namespace opts
 
 namespace llvm {
@@ -147,7 +153,7 @@ bool InjectPrefetchPass::runOnFunction(BinaryFunction &BF) {
     if (Loads[i]->getOperand(0).getReg()==DemandLoadDstRegNum){
       DemandLoads.push_back(Loads[i]);
       uint64_t AbsoluteAddr = (uint64_t)BC.MIB->getAnnotationAs<uint64_t>(*Loads[i], "AbsoluteAddr"); 
-      llvm::outs()<<"[InjectPrefetchPass] addr: "<<utohexstr(AbsoluteAddr)<<"\n";
+      //llvm::outs()<<"[InjectPrefetchPass] addr: "<<utohexstr(AbsoluteAddr)<<"\n";
     } 
   }
   if (DemandLoads.size()!=1){
@@ -164,7 +170,7 @@ bool InjectPrefetchPass::runOnFunction(BinaryFunction &BF) {
     const MCInst &Instr = *I;
     if (BC.MIB->hasAnnotation(Instr, "AbsoluteAddr")){
       uint64_t AbsoluteAddr = (uint64_t)BC.MIB->getAnnotationAs<uint64_t>(Instr, "AbsoluteAddr");        
-      llvm::outs()<<"[InjectPrefetchPass] header: "<<utohexstr(AbsoluteAddr)<<"\n";
+      //llvm::outs()<<"[InjectPrefetchPass] header: "<<utohexstr(AbsoluteAddr)<<"\n";
     } 
   } 
 
@@ -237,8 +243,10 @@ bool InjectPrefetchPass::runOnFunction(BinaryFunction &BF) {
 }
 
 void InjectPrefetchPass::runOnFunctions(BinaryContext &BC) {
-   for (auto &it: BC.getBinaryFunctions()){
-      runOnFunction(it.second);
+   if (opts::InjectPrefetch){
+      for (auto &it: BC.getBinaryFunctions()){
+         runOnFunction(it.second);
+      }
    }
 }
 
