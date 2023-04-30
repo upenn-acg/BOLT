@@ -1215,6 +1215,10 @@ bool BinaryFunction::disassemble() {
 
 
   auto getTopLLCMissLocFromFile = [&](){
+    if (opts::PrefetchLocationFile.empty()) {
+      errs() << "BOLT-ERROR: after add --inject-prefetch flag, --prefetch-location-file also need to be specified\n";
+      exit(-1);
+    }
     std::unordered_map<std::string, uint64_t> locations;
 
     std::string FileName = opts::PrefetchLocationFile;
@@ -1281,7 +1285,6 @@ bool BinaryFunction::disassemble() {
 
     if (opts::InjectPrefetch){
       if (locations.find(realFuncName)!=locations.end()){
-//      if (this->getOneName()=="_Z7do_workPv"){ 
          MIB->addAnnotation(Instruction, "AbsoluteAddr", static_cast<uint64_t>(AbsoluteInstrAddr));
       }
     }

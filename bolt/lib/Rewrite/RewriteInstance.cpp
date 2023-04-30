@@ -2558,6 +2558,10 @@ void RewriteInstance::selectFunctionsToProcess() {
 
 
   auto getTopLLCMissLocFromFile = [&](){
+    if (opts::PrefetchLocationFile.empty()) {
+      errs() << "BOLT-ERROR: after add --inject-prefetch flag, --prefetch-location-file also need to be specified\n";
+      exit(-1);
+    }
     std::unordered_map<std::string, uint64_t> locations;
 
     std::string FileName = opts::PrefetchLocationFile;
@@ -2580,14 +2584,12 @@ void RewriteInstance::selectFunctionsToProcess() {
 
 
   auto shouldProcess = [&](const BinaryFunction &Function) {
-
     if (opts::InjectPrefetch){
       std::unordered_map<std::string, uint64_t> locations = getTopLLCMissLocFromFile();
       std::string demangledFuncName = Function.getDemangledName();
       std::string realFuncName = demangledFuncName.substr(0, demangledFuncName.find("("));
 
       if (locations.find(realFuncName)!=locations.end()){
-      //if (Function.getOneName()=="_Z7do_workPv"){
         return true;  
       }
       else{

@@ -42,7 +42,7 @@ bool InjectPrefetchPass::runOnFunction(BinaryFunction &BF) {
   std::string demangledFuncName = removeSuffix(BF.getDemangledName());
   uint64_t TopLLCMissAddr = TopLLCMissLocations[demangledFuncName];
 
-  llvm::outs()<<"[InjectPrefetchPass] The starting address of do_work is: 0x"
+  llvm::outs()<<"[InjectPrefetchPass] The starting address of "<<demangledFuncName<<" is: 0x"
               <<utohexstr(startingAddr)<<"\n";
   llvm::outs()<<"[InjectPrefetchPass] The top llc miss addr is: 0x"
               <<utohexstr(TopLLCMissAddr)<<"\n";
