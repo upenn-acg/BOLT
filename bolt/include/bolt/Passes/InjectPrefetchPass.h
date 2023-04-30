@@ -11,34 +11,6 @@
 
 #include "bolt/Passes/BinaryPasses.h"
 
-// This pass founds cases when BBs have layout:
-// #BB0:
-// ....
-// #BB1:
-// cmp
-// cond_jmp #BB3
-// #BB2:
-// <loop body>
-// jmp #BB1
-// #BB3:
-// <loop exit>
-//
-// And swaps BB1 and BB2:
-// #BB0:
-// ....
-// jmp #BB1
-// #BB2:
-// <loop body>
-// #BB1:
-// cmp
-// cond_njmp #BB2
-// #BB3:
-// <loop exit>
-//
-// And vice versa depending on the profile information.
-// The advantage is that the loop uses only one conditional jump,
-// the unconditional jump is only used once on the loop start.
-
 namespace llvm {
 namespace bolt {
 
@@ -47,10 +19,15 @@ public:
   explicit InjectPrefetchPass() : BinaryFunctionPass(false) {}
 
   const char *getName() const override { return "inject-prefetch"; }
-
   /// Pass entry point
+  std::unordered_map<std::string, uint64_t> getTopLLCMissLocationFromFile();
+  std::vector<std::string> splitLine(std::string);
+  std::string removeSuffix(std::string);
   void runOnFunctions(BinaryContext &BC) override;
   bool runOnFunction(BinaryFunction &Function);
+
+private:
+  std::unordered_map<std::string, uint64_t> TopLLCMissLocations;
 };
 
 } // namespace bolt

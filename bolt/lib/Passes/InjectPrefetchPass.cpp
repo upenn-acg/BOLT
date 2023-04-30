@@ -13,6 +13,11 @@
 #include "bolt/Passes/InjectPrefetchPass.h"
 #include "bolt/Core/ParallelUtilities.h"
 #include <unordered_map>
+#include <fstream>
+#include <iostream>
+#include <sstream>
+#include <vector>
+#include <string>
 
 using namespace llvm;
 
@@ -41,13 +46,17 @@ namespace bolt {
 
 bool InjectPrefetchPass::runOnFunction(BinaryFunction &BF) {
 
-  if (BF.getOneName() != "_Z7do_workPv") return false;
+ // if (BF.getOneName() != "_Z7do_workPv") return false;
 
   BinaryContext& BC = BF.getBinaryContext();
   uint64_t startingAddr = BF.getAddress();
+  std::string demangledFuncName = removeSuffix(BF.getDemangledName());
+  uint64_t TopLLCMissAddr = TopLLCMissLocations[demangledFuncName];
 
   llvm::outs()<<"[InjectPrefetchPass] The starting address of do_work is: 0x"
               <<utohexstr(startingAddr)<<"\n";
+  llvm::outs()<<"[InjectPrefetchPass] The top llc miss addr is: 0x"
+              <<utohexstr(TopLLCMissAddr)<<"\n";
 
 
   // get the Instruction and Basic Block that contains 
@@ -62,7 +71,7 @@ bool InjectPrefetchPass::runOnFunction(BinaryFunction &BF) {
       MCInst &Instr = *It;
       if (BC.MIB->hasAnnotation(Instr, "AbsoluteAddr")){
         uint64_t AbsoluteAddr = (uint64_t)BC.MIB->getAnnotationAs<uint64_t>(Instr, "AbsoluteAddr");        
-        if (AbsoluteAddr == 0x401520){
+        if (AbsoluteAddr == TopLLCMissAddr){
           llvm::outs()<<"[InjectPrefetchPass] find instruction that causes the TOP LLC miss\n";
           if (BC.MIB->isLoad(Instr)){
             llvm::outs()<<"[InjectPrefetchPass] TOP LLC miss instruction is a load\n";           
@@ -242,11 +251,60 @@ bool InjectPrefetchPass::runOnFunction(BinaryFunction &BF) {
    return true;
 }
 
-void InjectPrefetchPass::runOnFunctions(BinaryContext &BC) {
-   if (opts::InjectPrefetch){
-      for (auto &it: BC.getBinaryFunctions()){
-         runOnFunction(it.second);
+std::vector<std::string> InjectPrefetchPass::splitLine(std::string str){
+   std::vector<std::string> words;
+   std::stringstream ss(str);
+   std::string tmp;
+   while (ss >> tmp){
+      words.push_back(tmp);
+      tmp.clear();
+   }
+   return words;
+}
+
+
+std::unordered_map<std::string, uint64_t> InjectPrefetchPass::getTopLLCMissLocationFromFile(){
+   std::unordered_map<std::string, uint64_t> locations;
+
+   std::string FileName = opts::PrefetchLocationFile; 
+   std::fstream f;
+   f.open(FileName, std::ios::in); 
+    
+   if (f.is_open()) { 
+      std::string line;
+      while (getline(f, line)) { 
+         std::vector<std::string> words = splitLine(line); 
+         if (words.size()==2){
+            uint64_t addr = stoi(words[1], 0, 16);
+            locations.insert(make_pair(words[0], addr));
+         }
+         llvm::outs() << line << "\n"; 
       }
+        
+      // Close the file object.
+      f.close(); 
+   }
+   return locations;
+}
+
+
+std::string InjectPrefetchPass::removeSuffix(std::string FuncName){
+   return FuncName.substr(0, FuncName.find("("));
+}
+
+
+void InjectPrefetchPass::runOnFunctions(BinaryContext &BC) {
+   if (!opts::InjectPrefetch) return;
+   if (opts::PrefetchLocationFile.empty()) return;
+   TopLLCMissLocations 
+      = getTopLLCMissLocationFromFile();
+
+
+   for (auto &it: BC.getBinaryFunctions()){
+      std::string FunctionFullName = it.second.getDemangledName();
+      std::string FuncName = removeSuffix(FunctionFullName);
+      if (TopLLCMissLocations.find(FuncName)!=TopLLCMissLocations.end())
+         runOnFunction(it.second);
    }
 }
 
