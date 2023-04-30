@@ -58,6 +58,8 @@ extern cl::opt<bool> Instrument;
 extern cl::opt<bool> StrictMode;
 extern cl::opt<bool> UpdateDebugSections;
 extern cl::opt<unsigned> Verbosity;
+extern cl::opt<bool> InjectPrefetch;
+extern cl::opt<std::string> PrefetchLocationFile;
 
 extern bool processAllFunctions();
 
@@ -1233,9 +1235,10 @@ bool BinaryFunction::disassemble() {
     }
 
     // zyuxuan
-    if (this->getOneName()=="_Z7do_workPv"){ 
-      MIB->addAnnotation(Instruction, "AbsoluteAddr", static_cast<uint64_t>(AbsoluteInstrAddr));
-//      InstructionWithAddr.insert(std::make_pair(AbsoluteInstrAddr, &Instruction));
+    if (opts::InjectPrefetch){
+      if (this->getOneName()=="_Z7do_workPv"){ 
+         MIB->addAnnotation(Instruction, "AbsoluteAddr", static_cast<uint64_t>(AbsoluteInstrAddr));
+      }
     }
     // Check integrity of LLVM assembler/disassembler.
     if (opts::CheckEncoding && !BC.MIB->isBranch(Instruction) &&

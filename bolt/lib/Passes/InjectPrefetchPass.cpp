@@ -25,19 +25,8 @@ namespace opts {
 
 extern cl::OptionCategory BoltCategory;
 
-//extern cl::opt<bolt::ReorderBasicBlocks::LayoutType> ReorderBlocks;
-
-
-static cl::opt<bool> InjectPrefetch(
-    "inject-prefetch",
-    cl::desc("inject prefetch to load that has the highest LLC miss in a nested loop"),
-    cl::init(false), cl::cat(BoltCategory), cl::ReallyHidden);
-
-static cl::opt<std::string>
-PrefetchLocationFile("prefetech-location-file",
-  cl::desc("file that contains top LLC miss location"),
-  cl::Hidden,
-  cl::cat(BoltCategory));
+extern cl::opt<bool> InjectPrefetch;
+extern cl::opt<std::string> PrefetchLocationFile;
 
 } // namespace opts
 
@@ -71,7 +60,7 @@ bool InjectPrefetchPass::runOnFunction(BinaryFunction &BF) {
       MCInst &Instr = *It;
       if (BC.MIB->hasAnnotation(Instr, "AbsoluteAddr")){
         uint64_t AbsoluteAddr = (uint64_t)BC.MIB->getAnnotationAs<uint64_t>(Instr, "AbsoluteAddr");        
-        if (AbsoluteAddr == TopLLCMissAddr){
+        if (AbsoluteAddr == 0x401520){
           llvm::outs()<<"[InjectPrefetchPass] find instruction that causes the TOP LLC miss\n";
           if (BC.MIB->isLoad(Instr)){
             llvm::outs()<<"[InjectPrefetchPass] TOP LLC miss instruction is a load\n";           

@@ -36,6 +36,18 @@ cl::OptionCategory BoltInstrCategory("BOLT instrumentation options");
 
 cl::SubCommand HeatmapCommand("heatmap", "generate heatmap");
 
+cl::opt<bool> 
+    InjectPrefetch("inject-prefetch",
+    cl::desc("inject prefetch to load that has the highest LLC miss in a nested loop"),
+    cl::init(false), 
+    cl::cat(BoltCategory));
+
+cl::opt<std::string>
+PrefetchLocationFile("prefetech-location-file",
+  cl::desc("file that contains top LLC miss location"),
+  cl::Hidden,
+  cl::cat(BoltCategory));
+
 cl::opt<unsigned>
 AlignText("align-text",
   cl::desc("alignment of .text section"),

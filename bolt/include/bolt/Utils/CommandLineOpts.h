@@ -30,6 +30,8 @@ extern llvm::cl::OptionCategory BoltInstrCategory;
 
 extern llvm::cl::SubCommand HeatmapCommand;
 
+extern llvm::cl::opt<bool> InjectPrefetch;
+extern llvm::cl::opt<std::string> PrefetchLocationFile;
 extern llvm::cl::opt<unsigned> AlignText;
 extern llvm::cl::opt<bool> AggregateOnly;
 extern llvm::cl::opt<unsigned> BucketsPerLine;
