@@ -1229,10 +1229,7 @@ bool BinaryFunction::disassemble() {
             uint64_t addr = stoi(words[1], 0, 16);
             locations.insert(make_pair(words[0], addr));
          }
-         llvm::outs() << line << "\n";
       }
-
-      // Close the file object.
       f.close();
     }
     return locations;

@@ -58,6 +58,7 @@
 #include <algorithm>
 #include <fstream>
 #include <system_error>
+#include <sstream>
 
 #undef  DEBUG_TYPE
 #define DEBUG_TYPE "bolt"
@@ -2543,13 +2544,55 @@ void RewriteInstance::selectFunctionsToProcess() {
       LiteThresholdExecCount, static_cast<uint64_t>(opts::LiteThresholdCount));
 
   uint64_t NumFunctionsToProcess = 0;
+
+  auto splitLine = [&](std::string str){
+    std::vector<std::string> words;
+    std::stringstream ss(str);
+    std::string tmp;
+    while (ss >> tmp){
+      words.push_back(tmp);
+      tmp.clear();
+    }
+    return words;
+  };
+
+
+  auto getTopLLCMissLocFromFile = [&](){
+    std::unordered_map<std::string, uint64_t> locations;
+
+    std::string FileName = opts::PrefetchLocationFile;
+    std::fstream f;
+    f.open(FileName, std::ios::in);
+
+    if (f.is_open()) {
+      std::string line;
+      while (getline(f, line)) {
+         std::vector<std::string> words = splitLine(line);
+         if (words.size()==2){
+            uint64_t addr = stoi(words[1], 0, 16);
+            locations.insert(make_pair(words[0], addr));
+         }
+      }
+      f.close();
+    }
+    return locations;
+  };
+
+
   auto shouldProcess = [&](const BinaryFunction &Function) {
 
-    if (Function.getOneName()=="_Z7do_workPv"){
-      return true;  
-    }
-    else{
-      return false;
+    if (opts::InjectPrefetch){
+      std::unordered_map<std::string, uint64_t> locations = getTopLLCMissLocFromFile();
+      std::string demangledFuncName = Function.getDemangledName();
+      std::string realFuncName = demangledFuncName.substr(0, demangledFuncName.find("("));
+
+      if (locations.find(realFuncName)!=locations.end()){
+      //if (Function.getOneName()=="_Z7do_workPv"){
+        return true;  
+      }
+      else{
+        return false;
+      }
     }
 
     if (opts::MaxFunctions && NumFunctionsToProcess > opts::MaxFunctions)
