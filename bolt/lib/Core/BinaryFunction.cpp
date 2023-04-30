@@ -41,6 +41,8 @@
 #include <limits>
 #include <numeric>
 #include <string>
+#include <sstream>
+#include <fstream>
 
 #define DEBUG_TYPE "bolt"
 
@@ -1200,6 +1202,52 @@ bool BinaryFunction::disassemble() {
     }
   };
 
+  auto splitLine = [&](std::string str){
+    std::vector<std::string> words;
+    std::stringstream ss(str);
+    std::string tmp;
+    while (ss >> tmp){
+      words.push_back(tmp);
+      tmp.clear();
+    }
+    return words;
+  };
+
+
+  auto getTopLLCMissLocFromFile = [&](){
+    std::unordered_map<std::string, uint64_t> locations;
+
+    std::string FileName = opts::PrefetchLocationFile;
+    std::fstream f;
+    f.open(FileName, std::ios::in);
+
+    if (f.is_open()) {
+      std::string line;
+      while (getline(f, line)) {
+         std::vector<std::string> words = splitLine(line);
+         if (words.size()==2){
+            uint64_t addr = stoi(words[1], 0, 16);
+            locations.insert(make_pair(words[0], addr));
+         }
+         llvm::outs() << line << "\n";
+      }
+
+      // Close the file object.
+      f.close();
+    }
+    return locations;
+  };
+
+  std::unordered_map<std::string, uint64_t> locations;
+  std::string demangledFuncName;
+  std::string realFuncName; 
+
+  if (opts::InjectPrefetch){
+    locations = getTopLLCMissLocFromFile();
+    demangledFuncName = this->getDemangledName();
+    realFuncName = demangledFuncName.substr(0, demangledFuncName.find("(")); 
+  }
+
   uint64_t Size = 0; // instruction size
   for (uint64_t Offset = 0; Offset < getSize(); Offset += Size) {
     MCInst Instruction;
@@ -1234,9 +1282,9 @@ bool BinaryFunction::disassemble() {
       break;
     }
 
-    // zyuxuan
     if (opts::InjectPrefetch){
-      if (this->getOneName()=="_Z7do_workPv"){ 
+      if (locations.find(realFuncName)!=locations.end()){
+//      if (this->getOneName()=="_Z7do_workPv"){ 
          MIB->addAnnotation(Instruction, "AbsoluteAddr", static_cast<uint64_t>(AbsoluteInstrAddr));
       }
     }
