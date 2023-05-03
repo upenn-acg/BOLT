@@ -472,6 +472,11 @@ public:
     return false;
   }
 
+  virtual bool isJCC(const MCInst &Inst) const {
+    llvm_unreachable("not implemented");
+    return false;
+  }
+
   virtual bool isBreakpoint(const MCInst &Inst) const {
     llvm_unreachable("not implemented");
     return false;
@@ -530,6 +535,17 @@ public:
     llvm_unreachable("not implemented");
     return false;
   }
+
+  virtual bool isADD(const MCInst &Inst) const {
+    llvm_unreachable("not implemented");
+    return false;
+  }
+
+  virtual bool isCMP(const MCInst &Inst) const {
+    llvm_unreachable("not implemented");
+    return false;
+  }
+
 
   virtual bool isSUB(const MCInst &Inst) const {
     llvm_unreachable("not implemented");
@@ -1509,6 +1525,19 @@ public:
     llvm_unreachable("not implemented");
     return false; 
   }
+
+  virtual bool createADD64ri32(MCInst &Inst, const MCPhysReg &DstReg,
+                                const MCPhysReg &SrcReg, int64_t Value) const {
+    llvm_unreachable("not implemented");
+    return false; 
+  }
+
+  virtual bool createMOV64rr(MCInst &Inst, const MCPhysReg &DstReg,
+                                const MCPhysReg &SrcReg) const {
+    llvm_unreachable("not implemented");
+    return false; 
+  }
+
 
   /// Creates a call frame pseudo instruction. A single operand identifies which
   /// MCCFIInstruction this MCInst is referring to.

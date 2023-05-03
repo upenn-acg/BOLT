@@ -361,6 +361,16 @@ public:
   }
 
 
+  bool isJCC(const MCInst &Inst) const override {
+    switch (Inst.getOpcode()) {
+      case X86::JCC_1:
+      case X86::JCC_2:
+      case X86::JCC_4:
+         return true;
+    }
+    return false;
+  }
+
 
   unsigned getCondCode(const MCInst &Inst) const override {
     switch (Inst.getOpcode()) {
@@ -596,6 +606,14 @@ public:
 
   bool isADD64rr(const MCInst &Inst) const override {
     return Inst.getOpcode() == X86::ADD64rr;
+  }
+
+  bool isADD(const MCInst &Inst) const override {
+    return ::isADD(Inst.getOpcode());
+  }
+
+  bool isCMP(const MCInst &Inst) const override {
+    return ::isCMP(Inst.getOpcode());
   }
 
   bool isSUB(const MCInst &Inst) const override {
@@ -2630,6 +2648,7 @@ public:
     return true;
   }
 
+
   bool createSaveToStack(MCInst &Inst, const MCPhysReg &StackReg, int Offset,
                          const MCPhysReg &SrcReg, int Size) const override {
     unsigned NewOpcode;
@@ -2760,6 +2779,26 @@ public:
     Inst.addOperand(MCOperand::createImm(0));
     return true;
   } 
+
+
+  bool createADD64ri32(MCInst &Inst, const MCPhysReg &DstReg, 
+                     const MCPhysReg &SrcReg, int64_t Value) const override{
+    Inst.setOpcode(X86::ADD64ri32);
+    Inst.addOperand(MCOperand::createReg(DstReg));
+    Inst.addOperand(MCOperand::createReg(SrcReg));
+    Inst.addOperand(MCOperand::createImm(Value));
+    return true;
+  }
+
+
+  bool createMOV64rr(MCInst &Inst, const MCPhysReg &DstReg, 
+                     const MCPhysReg &SrcReg) const override{
+    Inst.setOpcode(X86::MOV64rr);
+    Inst.addOperand(MCOperand::createReg(SrcReg));
+    Inst.addOperand(MCOperand::createReg(DstReg));
+    return true;
+  }
+
 
   InstructionListType createInlineMemcpy(bool ReturnEnd) const override {
     InstructionListType Code;
@@ -3085,9 +3124,9 @@ public:
 
     // Get the HasLHS value so that iteration can be done
     bool HasLHS;
-    if (isAND(Inst.getOpcode()) || isADD(Inst.getOpcode()) || isSUB(Inst)) {
+    if (isAND(Inst.getOpcode()) || ::isADD(Inst.getOpcode()) || isSUB(Inst)) {
       HasLHS = true;
-    } else if (isPop(Inst) || isPush(Inst) || isCMP(Inst.getOpcode()) ||
+    } else if (isPop(Inst) || isPush(Inst) || ::isCMP(Inst.getOpcode()) ||
                isTEST(Inst.getOpcode())) {
       HasLHS = false;
     } else {
@@ -3395,6 +3434,8 @@ public:
     Inst.addOperand(MCOperand::createReg(Reg));
     Inst.addOperand(MCOperand::createImm(Value));
   }
+
+
 
   void createClearRegWithNoEFlagsUpdate(MCInst &Inst, MCPhysReg Reg,
                                         unsigned Size) const {

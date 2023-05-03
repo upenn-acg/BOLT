@@ -60,7 +60,7 @@ bool InjectPrefetchPass::runOnFunction(BinaryFunction &BF) {
       MCInst &Instr = *It;
       if (BC.MIB->hasAnnotation(Instr, "AbsoluteAddr")){
         uint64_t AbsoluteAddr = (uint64_t)BC.MIB->getAnnotationAs<uint64_t>(Instr, "AbsoluteAddr");        
-        if (AbsoluteAddr == 0x401520){
+        if (AbsoluteAddr == TopLLCMissAddr){
           llvm::outs()<<"[InjectPrefetchPass] find instruction that causes the TOP LLC miss\n";
           if (BC.MIB->isLoad(Instr)){
             llvm::outs()<<"[InjectPrefetchPass] TOP LLC miss instruction is a load\n";           
@@ -164,15 +164,14 @@ bool InjectPrefetchPass::runOnFunction(BinaryFunction &BF) {
   // the loop we want
   // we are going to insert prefetch to the header basic block
   BinaryBasicBlock *HeaderBB = OuterLoop->getHeader();
-  for (auto I = HeaderBB->begin(); I != HeaderBB->end(); I++) {
-    const MCInst &Instr = *I;
-    if (BC.MIB->hasAnnotation(Instr, "AbsoluteAddr")){
-      uint64_t AbsoluteAddr = (uint64_t)BC.MIB->getAnnotationAs<uint64_t>(Instr, "AbsoluteAddr");        
-      //llvm::outs()<<"[InjectPrefetchPass] header: "<<utohexstr(AbsoluteAddr)<<"\n";
-    } 
-  } 
 
-  // Now we have the loop header
+  for (auto I = HeaderBB->begin(); I != HeaderBB->end(); I++){
+    MCInst &Inst = *I;
+    if (BC.MIB->isJCC(Inst)){
+      llvm::outs()<<"@@@ ### is Jump\n";
+    }
+  }
+
   // In the loop header, we need to inject prefetch instruction 
   // first Push %rax 
   auto Loc = HeaderBB->begin();
@@ -207,11 +206,116 @@ bool InjectPrefetchPass::runOnFunction(BinaryFunction &BF) {
   Loc = HeaderBB->insertRealInstruction(Loc, PrefetchInst);
   Loc++;  
 
-
   // finally pop %rax
   MCInst PopInst; 
   BC.MIB->createPopRegister(PopInst, BC.MIB->getX86RAX(), 8);
   HeaderBB->insertRealInstruction(Loc, PopInst);
+
+
+  // the next part is to inject the boundary check
+  // first step is to detect loop induction variable
+  // and the gaurd of the outer loop
+  SmallVector<BinaryBasicBlock *, 1> Latches;
+  OuterLoop->getLoopLatches(Latches);
+  llvm::outs()<<"[InjectPrefetchPass] number of latches in the outer loop: "<< Latches.size()<<"\n";
+
+  if (Latches.size()==0) return false;
+  
+  MCInst* LoopInductionInstr = NULL;
+  MCInst* LoopGuardCMPInstr = NULL;
+  for (unsigned i=0; i<Latches.size(); i++){
+    for (auto I = Latches[i]->begin(); I != Latches[i]->end(); I++){
+       MCInst &Inst = *I;
+       if (BC.MIB->isADD(Inst)){
+          int immValue = Inst.getOperand(2).getImm();
+          if (immValue != 1) continue;
+          if (!(DemandLoadInstr->getOperand(3).getReg()==Inst.getOperand(0).getReg())) continue;
+          LoopInductionInstr = &Inst;
+       }
+       else if (BC.MIB->isCMP(Inst)){
+          if (DemandLoadInstr->getOperand(3).getReg()==Inst.getOperand(0).getReg()){
+            LoopGuardCMPInstr = & Inst;
+          }
+       }
+    }
+  }
+
+
+  // create the boundary check basic block
+  // in this BB, it contains the following 4 instructions
+  // push %rax
+  // mov %rdx, %rax
+  // add 0x20, %rax
+  // cmp 0x18(%rsp), rax
+  // jz 0xa1(%rip)
+  MCSymbol *Label = BC.Ctx->createNamedTempSymbol("BoundaryCheckBB");
+  std::unique_ptr<BinaryBasicBlock>  BoundCheckBB = BF.createBasicBlock(BinaryBasicBlock::INVALID_OFFSET, Label);
+
+  std::vector<std::unique_ptr<BinaryBasicBlock>> BoundCheckBBs;
+  BoundCheckBBs.emplace_back(BF.createBasicBlock(BinaryBasicBlock::INVALID_OFFSET, Label));
+  BoundCheckBBs.back()->addSuccessor(HeaderBB, 0,0);
+
+  // create push %rax 
+  MCInst PushInst2; 
+  BC.MIB->createPushRegister(PushInst2, BC.MIB->getX86RAX(), 8);
+  BoundCheckBBs.back()->addInstruction(PushInst2);
+
+  // create mov %rdx, %rax
+  MCInst MovInstr;
+  BC.MIB->createMOV64rr(MovInstr, BC.MIB->getX86RDX(), BC.MIB->getX86RAX());
+  BoundCheckBBs.back()->addInstruction(MovInstr);
+
+  // create add %rax 0x20
+  int prefetchDist = 64;
+  MCInst AddInstr;
+  BC.MIB->createADD64ri32(AddInstr, BC.MIB->getX86RAX(), BC.MIB->getX86RAX(), prefetchDist);
+  BoundCheckBBs.back()->addInstruction(AddInstr);
+
+  // create unconditional branch at the end of this basic block
+  BoundCheckBBs.back()->addBranchInstruction(HeaderBB);
+
+  // insert this Basic Block to binary function
+  BF.insertBasicBlocks(HeaderBB->pred_begin(), std::move(BoundCheckBBs));
+
+  // change the predesessor of HeaderBB points to this BB
+
+  // create prefetchBB
+  // in prefetchBB it contains
+  // mov 0x200(%r9,%rdx,8),%rax 
+  // prefetcht0 (%rax) 
+  MCSymbol *Label2 = BC.Ctx->createNamedTempSymbol("PrefetchBB");
+  std::unique_ptr<BinaryBasicBlock> PrefetchBB = BF.createBasicBlock(BinaryBasicBlock::INVALID_OFFSET, Label2);
+
+  // add the load instructiona that load the target address
+  // for prefetch
+  // then load prefetch target's address
+  // mov 0x200(%r9,%rdx,8),%rax 
+  int numOperands2 = DemandLoadInstr->getNumOperands();
+  MCInst LoadPrefetchAddrInstr2;
+  LoadPrefetchAddrInstr2.setOpcode(DemandLoadInstr->getOpcode());
+  for (int i=0; i<numOperands2; i++){
+     if (i==0){
+       // the first operand is the dest reg
+       LoadPrefetchAddrInstr2.addOperand(MCOperand::createReg(BC.MIB->getX86RAX())); 
+     }
+     else if (i==4){
+       // the 5th operand is the offset
+       LoadPrefetchAddrInstr2.addOperand(MCOperand::createImm(prefetchDist*8));
+     }
+     else{
+       LoadPrefetchAddrInstr2.addOperand(DemandLoadInstr->getOperand(i));
+     }
+  }
+  PrefetchBB->addInstruction(LoadPrefetchAddrInstr2);
+
+  // prefetcht0 (%rax) 
+  MCInst PrefetchInst2;
+  BC.MIB->createPrefetchT0(PrefetchInst2, BC.MIB->getX86RAX(), 0, BC.MIB->getNoRegister(), 0, BC.MIB->getNoRegister(), LoadPrefetchAddrInstr);
+  PrefetchBB->addInstruction(PrefetchInst2);
+ 
+  // create unconditional branch at the end of 
+  // prefetchBB
+  //PrefetchBB->addBranchInstruction(HeaderBB);  
 
   /*------------------no use code-----------------*/
   // if the loop doesn't contain latch, return false
