@@ -198,39 +198,8 @@ bool InjectPrefetchPass::runOnFunction(BinaryFunction &BF) {
   // first Push %rax 
 
   auto Loc = HeaderBB->begin();
-/*
-  MCInst PushInst; 
-  BC.MIB->createPushRegister(PushInst, BC.MIB->getX86RAX(), 8);
-  Loc = HeaderBB->insertRealInstruction(Loc, PushInst);
-  Loc++;  
 
-  // then load prefetch target's address
-  int numOperands = DemandLoadInstr->getNumOperands();
-  MCInst LoadPrefetchAddrInstr;
-  LoadPrefetchAddrInstr.setOpcode(DemandLoadInstr->getOpcode());
-  for (int i=0; i<numOperands; i++){
-     if (i==0){
-       // the first operand is the dest reg
-       LoadPrefetchAddrInstr.addOperand(MCOperand::createReg(BC.MIB->getX86RAX())); 
-     }
-     else if (i==4){
-       // the 5th operand is the offset
-       LoadPrefetchAddrInstr.addOperand(MCOperand::createImm(512));
-     }
-     else{
-       LoadPrefetchAddrInstr.addOperand(DemandLoadInstr->getOperand(i));
-     }
-  }
-  Loc = HeaderBB->insertRealInstruction(Loc, LoadPrefetchAddrInstr);
-  Loc++;  
-
-
-  MCInst PrefetchInst;
-  BC.MIB->createPrefetchT0(PrefetchInst, BC.MIB->getX86RAX(), 0, BC.MIB->getNoRegister(), 0, BC.MIB->getNoRegister(), LoadPrefetchAddrInstr);
-  Loc = HeaderBB->insertRealInstruction(Loc, PrefetchInst);
-  Loc++;  
-*/
-  // finally pop %rax
+  // inject pop %rax
   MCInst PopInst; 
   BC.MIB->createPopRegister(PopInst, BC.MIB->getX86RAX(), 8);
   HeaderBB->insertRealInstruction(Loc, PopInst);
@@ -357,28 +326,28 @@ bool InjectPrefetchPass::runOnFunction(BinaryFunction &BF) {
   // for prefetch
   // then load prefetch target's address
   // mov 0x200(%r9,%rdx,8),%rax 
-  int numOperands2 = DemandLoadInstr->getNumOperands();
-  MCInst LoadPrefetchAddrInstr2;
-  LoadPrefetchAddrInstr2.setOpcode(DemandLoadInstr->getOpcode());
-  for (int i=0; i<numOperands2; i++){
+  int numOperands = DemandLoadInstr->getNumOperands();
+  MCInst LoadPrefetchAddrInstr;
+  LoadPrefetchAddrInstr.setOpcode(DemandLoadInstr->getOpcode());
+  for (int i=0; i<numOperands; i++){
      if (i==0){
        // the first operand is the dest reg
-       LoadPrefetchAddrInstr2.addOperand(MCOperand::createReg(BC.MIB->getX86RAX())); 
+       LoadPrefetchAddrInstr.addOperand(MCOperand::createReg(BC.MIB->getX86RAX())); 
      }
      else if (i==4){
        // the 5th operand is the offset
-       LoadPrefetchAddrInstr2.addOperand(MCOperand::createImm(prefetchDist*8));
+       LoadPrefetchAddrInstr.addOperand(MCOperand::createImm(prefetchDist*8));
      }
      else{
-       LoadPrefetchAddrInstr2.addOperand(DemandLoadInstr->getOperand(i));
+       LoadPrefetchAddrInstr.addOperand(DemandLoadInstr->getOperand(i));
      }
   }
-  PrefetchBBs.back()->addInstruction(LoadPrefetchAddrInstr2);
+  PrefetchBBs.back()->addInstruction(LoadPrefetchAddrInstr);
 
   // prefetcht0 (%rax) 
-  MCInst PrefetchInst2;
-  BC.MIB->createPrefetchT0(PrefetchInst2, BC.MIB->getX86RAX(), 0, BC.MIB->getNoRegister(), 0, BC.MIB->getNoRegister(), LoadPrefetchAddrInstr2);
-  PrefetchBBs.back()->addInstruction(PrefetchInst2);
+  MCInst PrefetchInst;
+  BC.MIB->createPrefetchT0(PrefetchInst, BC.MIB->getX86RAX(), 0, BC.MIB->getNoRegister(), 0, BC.MIB->getNoRegister(), LoadPrefetchAddrInstr);
+  PrefetchBBs.back()->addInstruction(PrefetchInst);
  
   // create unconditional branch at the end of 
   // prefetchBB
