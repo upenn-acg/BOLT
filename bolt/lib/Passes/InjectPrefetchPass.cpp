@@ -165,38 +165,9 @@ bool InjectPrefetchPass::runOnFunction(BinaryFunction &BF) {
   // we are going to insert prefetch to the header basic block
   BinaryBasicBlock *HeaderBB = OuterLoop->getHeader();
 
-  for (auto I = HeaderBB->begin(); I != HeaderBB->end(); I++){
-    MCInst &Inst = *I;
-    if (BC.MIB->isJCC(Inst)){
-      llvm::outs()<<"@@@ ### is Jump\n";
-      int numOperands = Inst.getNumOperands();
-      llvm::outs()<<"@@@ num of operands = "<<numOperands<<"\n";
-      for (int i=0; i<numOperands; i++){
-        if(Inst.getOperand(i).isReg()){
-           llvm::outs()<<"Is a reg\n"; 
-        }
-        else if (Inst.getOperand(i).isImm()){
-           llvm::outs()<<"Is a Imm\n";
-        }
-        else if (Inst.getOperand(i).isExpr()){
-           llvm::outs()<<"Is a Expr\n";
-        }
-        else if (Inst.getOperand(i).isInst()){
-           llvm::outs()<<"Is a Inst\n";
-        }
-        else if (Inst.getOperand(i).isSFPImm()){
-           llvm::outs()<<"Is a SFPImm\n";
-        }
-        else if (Inst.getOperand(i).isDFPImm()){
-           llvm::outs()<<"Is a DFPImm\n";
-        } 
-      }
-    }
-  }
 
   // In the loop header, we need to inject prefetch instruction 
   // first Push %rax 
-
   auto Loc = HeaderBB->begin();
 
   // inject pop %rax
@@ -292,7 +263,11 @@ bool InjectPrefetchPass::runOnFunction(BinaryFunction &BF) {
   for (int i=0; i<NumOperandsCMP; i++){
     if (i==0){
       CMPInstr.addOperand(MCOperand::createReg(BC.MIB->getX86RAX()));
-    } 
+    }
+    else if (i==4){
+      int64_t newDisp = LoopGuardCMPInstr->getOperand(i).getImm() + 8;
+      CMPInstr.addOperand(MCOperand::createImm(newDisp));
+    }
     else{
       CMPInstr.addOperand(LoopGuardCMPInstr->getOperand(i));
     }
@@ -302,7 +277,7 @@ bool InjectPrefetchPass::runOnFunction(BinaryFunction &BF) {
   //BoundCheckBBs.back()->addBranchInstruction(HeaderBB);
 
   // insert this Basic Block to binary function
-  BF.insertBasicBlocks(PredsOfHeaderBB[0], std::move(BoundCheckBBs));
+  BF.insertBasicBlocks(PredsOfHeaderBB[1], std::move(BoundCheckBBs));
 
   BinaryBasicBlock* BoundsCheckBB = BF.getBasicBlockForLabel(BoundsCheckLabel);    
 
@@ -370,32 +345,17 @@ bool InjectPrefetchPass::runOnFunction(BinaryFunction &BF) {
   BC.MIB->createJZ(BoundsCheckBranch, HeaderBB->getLabel()  , BC.Ctx.get());
   BoundsCheckBB->addInstruction(BoundsCheckBranch);
 
-
-
-
-
-
-
-
-  /*------------------no use code-----------------*/
-  // if the loop doesn't contain latch, return false
-  /*
-  for (BinaryBasicBlock *BB : BF.layout()) {
-    if (BB->succ_size() != 1 || BB->pred_size() != 1)
-      continue;
-
-    BinaryBasicBlock *SuccBB = *BB->succ_begin();
-    BinaryBasicBlock *PredBB = *BB->pred_begin();
-    const unsigned BBIndex = BB->getLayoutIndex();
-    const unsigned SuccBBIndex = SuccBB->getLayoutIndex();
-    const uint64_t BBCount = SuccBB->getBranchInfo(*BB).Count;
-
-    BB->setLayoutIndex(SuccBBIndex);
-    SuccBB->setLayoutIndex(BBIndex);
+  // change the pr
+  for (int i=0; i<PredsOfHeaderBB.size(); i++){
+    MCInst* LastBranch = PredsOfHeaderBB[i]->getLastNonPseudoInstr();
+    const MCExpr* LastBranchTargetExpr = LastBranch->getOperand(0).getExpr();
+    const MCSymbol* LastBranchTargetSymbol = BC.MIB->getTargetSymbol(LastBranchTargetExpr);
+    if (LastBranchTargetSymbol==HeaderBB->getLabel()){
+      BC.MIB->replaceBranchTarget(*LastBranch, BoundsCheckBB->getLabel(), BC.Ctx.get());
+    }
   }
 
-  */
-   return true;
+  return true;
 }
 
 std::vector<std::string> InjectPrefetchPass::splitLine(std::string str){
