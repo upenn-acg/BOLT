@@ -2800,6 +2800,15 @@ public:
   }
 
 
+  bool createJZ(MCInst &Inst, const MCSymbol *Target, MCContext *Ctx) const override{
+    Inst.setOpcode(X86::JCC_1);
+    Inst.addOperand(MCOperand::createExpr(MCSymbolRefExpr::create(Target,MCSymbolRefExpr::VK_None, *Ctx)));
+    Inst.addOperand(MCOperand::createImm(X86::COND_E));
+    return true;
+  }
+
+
+
   InstructionListType createInlineMemcpy(bool ReturnEnd) const override {
     InstructionListType Code;
     if (ReturnEnd)

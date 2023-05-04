@@ -1537,6 +1537,13 @@ public:
     llvm_unreachable("not implemented");
     return false; 
   }
+  
+  virtual bool createJZ(MCInst &Inst, const MCSymbol *Target, 
+                        MCContext *Ctx) const{
+    llvm_unreachable("not implemented");
+    return false; 
+  }
+
 
 
   /// Creates a call frame pseudo instruction. A single operand identifies which

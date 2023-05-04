@@ -285,6 +285,7 @@ void BinaryBasicBlock::replaceSuccessor(BinaryBasicBlock *Succ,
   NewSucc->addPredecessor(this);
 }
 
+
 void BinaryBasicBlock::removeAllSuccessors() {
   SmallPtrSet<BinaryBasicBlock *, 2> UniqSuccessors(succ_begin(), succ_end());
   for (BinaryBasicBlock *SuccessorBB : UniqSuccessors)

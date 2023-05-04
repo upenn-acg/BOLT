@@ -166,6 +166,7 @@ private:
   void setLabel(MCSymbol *Symbol) { Label = Symbol; }
 
 public:
+  
   static constexpr uint64_t COUNT_INFERRED =
       std::numeric_limits<uint64_t>::max();
   static constexpr uint64_t COUNT_NO_PROFILE =
@@ -379,6 +380,9 @@ public:
   /// Return the related branch info as well as the successor.
   BinaryBasicBlock *getSuccessor(const MCSymbol *Label,
                                  BinaryBranchInfo &BI) const;
+
+  EdgeListType getPredecessors() {return Predecessors;}
+  void removeAllPredecessors(){Predecessors.clear();}
 
   /// If the basic block ends with a conditional branch (possibly followed by
   /// an unconditional branch) and thus has 2 successors, return a successor
@@ -916,6 +920,9 @@ public:
 
   bool hasJumpTable() const;
 
+  /// Adds predecessor to the BB. Most likely you don't need to call this.
+  void addPredecessor(BinaryBasicBlock *Pred);
+
 private:
   void adjustNumPseudos(const MCInst &Inst, int Sign);
 
@@ -923,9 +930,6 @@ private:
     while (Begin != End)
       adjustNumPseudos(*Begin++, Sign);
   }
-
-  /// Adds predecessor to the BB. Most likely you don't need to call this.
-  void addPredecessor(BinaryBasicBlock *Pred);
 
   /// Remove predecessor of the basic block. Don't use directly, instead
   /// use removeSuccessor() function.
