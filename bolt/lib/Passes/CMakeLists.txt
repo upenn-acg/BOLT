@@ -45,6 +45,7 @@ add_llvm_library(LLVMBOLTPasses
   VeneerElimination.cpp
   RetpolineInsertion.cpp
   InjectPrefetchPass.cpp
+  InjectPrefetchLitePass.cpp
 
   LINK_LIBS
   ${LLVM_PTHREAD_LIB}
