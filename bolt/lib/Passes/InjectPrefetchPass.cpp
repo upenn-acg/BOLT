@@ -345,7 +345,7 @@ bool InjectPrefetchPass::runOnFunction(BinaryFunction &BF) {
   BC.MIB->createJZ(BoundsCheckBranch, HeaderBB->getLabel()  , BC.Ctx.get());
   BoundsCheckBB->addInstruction(BoundsCheckBranch);
 
-  // change the pr
+  // change HeaderBB's original predecessors' tail branch targets
   for (int i=0; i<PredsOfHeaderBB.size(); i++){
     MCInst* LastBranch = PredsOfHeaderBB[i]->getLastNonPseudoInstr();
     const MCExpr* LastBranchTargetExpr = LastBranch->getOperand(0).getExpr();
