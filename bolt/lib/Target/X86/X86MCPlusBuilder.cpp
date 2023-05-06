@@ -3287,6 +3287,16 @@ public:
     return true;
   }
 
+
+  bool replaceUncondBranchTarget(MCInst &Inst, const MCSymbol *TBB,
+                           MCContext *Ctx) const override {
+    Inst.getOperand(0) = MCOperand::createExpr(
+        MCSymbolRefExpr::create(TBB, MCSymbolRefExpr::VK_None, *Ctx));
+    return true;
+  }
+
+
+
   MCPhysReg getX86R11() const override { return X86::R11; }
    
   MCPhysReg getX86RAX() const override { return X86::RAX; }

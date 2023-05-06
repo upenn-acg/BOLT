@@ -1646,6 +1646,12 @@ public:
     return false;
   }
 
+  virtual bool replaceUncondBranchTarget(MCInst &Inst, const MCSymbol *TBB,
+                                   MCContext *Ctx) const {
+    llvm_unreachable("not implemented");
+    return false;
+  }
+
   virtual bool createEHLabel(MCInst &Inst, const MCSymbol *Label,
                              MCContext *Ctx) const {
     Inst.setOpcode(TargetOpcode::EH_LABEL);

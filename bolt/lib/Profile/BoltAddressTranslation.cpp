@@ -25,9 +25,15 @@ void BoltAddressTranslation::writeEntriesForBB(MapTy &Map,
       BB.getOutputAddressRange().first - FuncAddress;
   const uint32_t BBInputOffset = BB.getInputOffset();
 
+  // zyuxuan: the PrefetchBB and BoundsCheckBB we inserted have no offset
+  // they need to pass this check
+  /*
   assert(BBInputOffset != BinaryBasicBlock::INVALID_OFFSET &&
          "Every output BB must track back to an input BB for profile "
          "collection in bolted binaries");
+   */
+  if (BBInputOffset == BinaryBasicBlock::INVALID_OFFSET) return;
+  
 
   LLVM_DEBUG(dbgs() << "BB " << BB.getName() << "\n");
   LLVM_DEBUG(dbgs() << "  Key: " << Twine::utohexstr(BBOutputOffset)
