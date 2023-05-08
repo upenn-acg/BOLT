@@ -32,6 +32,7 @@
 #include "bolt/Passes/ValidateInternalCalls.h"
 #include "bolt/Passes/VeneerElimination.h"
 #include "bolt/Passes/InjectPrefetchPass.h"
+#include "bolt/Passes/InjectPrefetchLitePass.h"
 #include "bolt/Utils/CommandLineOpts.h"
 #include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/Timer.h"
@@ -481,7 +482,7 @@ void BinaryFunctionPassManager::runAllPasses(BinaryContext &BC) {
   Manager.registerPass(std::make_unique<LowerAnnotations>(NeverPrint));
 */
   Manager.registerPass(std::make_unique<InjectPrefetchPass>());
-  Manager.registerPass(std::make_unique<InjectPrefetchLitePass>());
+  //Manager.registerPass(std::make_unique<InjectPrefetchLitePass>());
 
 
 
