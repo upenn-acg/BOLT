@@ -6,8 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef BOLT_PASSES_INJECTPREFETCH_H
-#define BOLT_PASSES_INJECTPREFETCH_H
+#ifndef BOLT_PASSES_INJECTPREFETCHLITE_H
+#define BOLT_PASSES_INJECTPREFETCHLITE_H
 
 #include "bolt/Passes/BinaryPasses.h"
 
