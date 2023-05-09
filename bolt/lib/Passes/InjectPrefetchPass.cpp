@@ -52,7 +52,7 @@ bool InjectPrefetchPass::runOnFunction(BinaryFunction &BF) {
   // the TOP LLC miss instruction. 
   BinaryBasicBlock* TopLLCMissBB;
   MCInst* TopLLCMissInstr;
-  MCInst* DemandLoadInstr;
+  MCInst DemandLoadInstr;
 
   for (auto BBI = BF.begin(); BBI != BF.end(); BBI ++){
     BinaryBasicBlock &BB = *BBI;
@@ -151,14 +151,14 @@ bool InjectPrefetchPass::runOnFunction(BinaryFunction &BF) {
     if (Loads[i]->getOperand(0).getReg()==DemandLoadDstRegNum){
       DemandLoads.push_back(Loads[i]);
       uint64_t AbsoluteAddr = (uint64_t)BC.MIB->getAnnotationAs<uint64_t>(*Loads[i], "AbsoluteAddr"); 
-      //llvm::outs()<<"[InjectPrefetchPass] addr: "<<utohexstr(AbsoluteAddr)<<"\n";
+      llvm::outs()<<"[InjectPrefetchPass] addr: "<<utohexstr(AbsoluteAddr)<<"\n";
     } 
   }
   if (DemandLoads.size()!=1){
     llvm::outs()<<"[InjectPrefetchPass][err] the number of potential Demand Load is "<<DemandLoads.size()<<"\n";
     return false;
   }
-  DemandLoadInstr = DemandLoads[0];
+  DemandLoadInstr = *DemandLoads[0];
 
   // get the loop header and check if the header is in
   // the loop we want
@@ -193,11 +193,11 @@ bool InjectPrefetchPass::runOnFunction(BinaryFunction &BF) {
        if (BC.MIB->isADD(Inst)){
           int immValue = Inst.getOperand(2).getImm();
           if (immValue != 1) continue;
-          if (!(DemandLoadInstr->getOperand(3).getReg()==Inst.getOperand(0).getReg())) continue;
+          if (!(DemandLoadInstr.getOperand(3).getReg()==Inst.getOperand(0).getReg())) continue;
           LoopInductionInstr = &Inst;
        }
        else if (BC.MIB->isCMP(Inst)){
-          if (DemandLoadInstr->getOperand(3).getReg()==Inst.getOperand(0).getReg()){
+          if (DemandLoadInstr.getOperand(3).getReg()==Inst.getOperand(0).getReg()){
             LoopGuardCMPInstr = & Inst;
           }
        }
@@ -301,9 +301,9 @@ bool InjectPrefetchPass::runOnFunction(BinaryFunction &BF) {
   // for prefetch
   // then load prefetch target's address
   // mov 0x200(%r9,%rdx,8),%rax 
-  int numOperands = DemandLoadInstr->getNumOperands();
+  int numOperands = DemandLoadInstr.getNumOperands();
   MCInst LoadPrefetchAddrInstr;
-  LoadPrefetchAddrInstr.setOpcode(DemandLoadInstr->getOpcode());
+  LoadPrefetchAddrInstr.setOpcode(DemandLoadInstr.getOpcode());
   for (int i=0; i<numOperands; i++){
      if (i==0){
        // the first operand is the dest reg
@@ -314,7 +314,7 @@ bool InjectPrefetchPass::runOnFunction(BinaryFunction &BF) {
        LoadPrefetchAddrInstr.addOperand(MCOperand::createImm(prefetchDist*8));
      }
      else{
-       LoadPrefetchAddrInstr.addOperand(DemandLoadInstr->getOperand(i));
+       LoadPrefetchAddrInstr.addOperand(DemandLoadInstr.getOperand(i));
      }
   }
   PrefetchBBs.back()->addInstruction(LoadPrefetchAddrInstr);
