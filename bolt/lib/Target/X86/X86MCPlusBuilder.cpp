@@ -2799,6 +2799,74 @@ public:
     return true;
   }
 
+  bool isLower32bitReg( const MCPhysReg fullReg,  
+                        const MCPhysReg lower32bitReg) const override{
+    if (fullReg == X86::RAX){
+      if (lower32bitReg == X86::EAX) return true;
+      else return false;
+    }
+    else if (fullReg == X86::RBX){
+      if (lower32bitReg == X86::EBX) return true;
+      else return false;     
+    }
+    else if (fullReg == X86::RCX){
+      if (lower32bitReg == X86::ECX) return true;
+      else return false;     
+    }
+    else if (fullReg == X86::RDX){
+      if (lower32bitReg == X86::EDX) return true;
+      else return false;     
+    }
+    else if (fullReg == X86::RSI){
+      if (lower32bitReg == X86::ESI) return true;
+      else return false;     
+    }
+    else if (fullReg == X86::RDI){
+      if (lower32bitReg == X86::EDI) return true;
+      else return false;     
+    }
+    else if (fullReg == X86::RSP){
+      if (lower32bitReg == X86::ESP) return true;
+      else return false;     
+    }
+    else if (fullReg == X86::RBP){
+      if (lower32bitReg == X86::EBP) return true;
+      else return false;     
+    }
+    else if (fullReg == X86::R9){
+      if (lower32bitReg == X86::R9D) return true;
+      else return false;     
+    }
+    else if (fullReg == X86::R10){
+      if (lower32bitReg == X86::R10D) return true;
+      else return false;     
+    }
+    else if (fullReg == X86::R11){
+      if (lower32bitReg == X86::R11D) return true;
+      else return false;     
+    }
+    else if (fullReg == X86::R12){
+      if (lower32bitReg == X86::R12D) return true;
+      else return false;     
+    }
+    else if (fullReg == X86::R13){
+      if (lower32bitReg == X86::R13D) return true;
+      else return false;     
+    }
+    else if (fullReg == X86::R14){
+      if (lower32bitReg == X86::R14D) return true;
+      else return false;     
+    }
+    else if (fullReg == X86::R15){
+      if (lower32bitReg == X86::R15D) return true;
+      else return false;     
+    }
+    else{
+      llvm::errs()<<"BOLT-ERROR: isLower32bitReg() doesn't support this regsiter\n";
+      exit(-1);
+    }
+  }
+
 
   bool createJZ(MCInst &Inst, const MCSymbol *Target, MCContext *Ctx) const override{
     Inst.setOpcode(X86::JCC_1);

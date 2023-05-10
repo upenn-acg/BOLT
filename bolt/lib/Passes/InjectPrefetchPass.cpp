@@ -146,19 +146,85 @@ bool InjectPrefetchPass::runOnFunction(BinaryFunction &BF) {
 
   // based on TopLLCMissInstr, decide the DemandLoadInstr
   unsigned DemandLoadDstRegNum = TopLLCMissInstr->getOperand(1).getReg();
-  std::vector<MCInst* >DemandLoads;
-  for (unsigned i=0; i<Loads.size(); i++){
-    if (Loads[i]->getOperand(0).getReg()==DemandLoadDstRegNum){
-      DemandLoads.push_back(Loads[i]);
-      uint64_t AbsoluteAddr = (uint64_t)BC.MIB->getAnnotationAs<uint64_t>(*Loads[i], "AbsoluteAddr"); 
-      llvm::outs()<<"[InjectPrefetchPass] addr: "<<utohexstr(AbsoluteAddr)<<"\n";
-    } 
+
+  // check if the demandLoad is in the same BB
+  std::vector<MCInst> potentialDemandLoads;
+  for (auto It = TopLLCMissBB->begin(); It != TopLLCMissBB->end(); It++){
+     MCInst &Instr = *It;
+     if (BC.MIB->hasAnnotation(Instr, "AbsoluteAddr")){
+       uint64_t AbsoluteAddr = (uint64_t)BC.MIB->getAnnotationAs<uint64_t>(Instr, "AbsoluteAddr");
+       if (AbsoluteAddr < TopLLCMissAddr){
+         if ((BC.MIB->isLoad(Instr)) && (Instr.getOperand(0).getReg()==DemandLoadDstRegNum)){
+            potentialDemandLoads.push_back(Instr);
+         }
+       }
+     }
   }
-  if (DemandLoads.size()!=1){
-    llvm::outs()<<"[InjectPrefetchPass][err] the number of potential Demand Load is "<<DemandLoads.size()<<"\n";
-    return false;
+  
+  // if demandLoad is not in the same BB as the TopLLCMissInstr
+  // find the demendLoad in the predcessors of the TopLLCMissBB
+  if (potentialDemandLoads.size()!=0){
+    DemandLoadInstr = potentialDemandLoads.back();
   }
-  DemandLoadInstr = *DemandLoads[0];
+  else {
+    std::unordered_set<BinaryBasicBlock* > currentBBs;
+    std::unordered_set<BinaryBasicBlock*> visitedBBs;
+    visitedBBs.insert(TopLLCMissBB);
+    for (auto BBI = TopLLCMissBB->pred_begin(); BBI != TopLLCMissBB->pred_end(); BBI++ ){
+      BinaryBasicBlock* BB = *BBI;
+      if (OuterLoop->contains(BB)){
+        if (currentBBs.find(*BBI)==currentBBs.end()){
+          currentBBs.insert(*BBI);
+        }
+      }
+    }
+    while (true){
+      for (auto it = currentBBs.begin(); it != currentBBs.end(); it++){
+        BinaryBasicBlock* currentBB = *it;
+        visitedBBs.insert(currentBB);
+        
+        MCInst* DemandLoadInThisBB = NULL;
+        for (auto It = currentBB->begin(); It != currentBB->end(); It++){
+          MCInst &Instr = *It;
+          if ((BC.MIB->isLoad(Instr)) && (Instr.getOperand(0).getReg()==DemandLoadDstRegNum)){
+             DemandLoadInThisBB = &Instr;
+          }
+        }
+        if (DemandLoadInThisBB != NULL){
+          potentialDemandLoads.push_back(*DemandLoadInThisBB); 
+        }
+      }
+      if (potentialDemandLoads.size()==0){
+        std::unordered_set<BinaryBasicBlock* > predBBs;
+        for (auto It = currentBBs.begin(); It != currentBBs.end(); It++){
+          BinaryBasicBlock* currentBB = *It;
+          for (auto BBI = currentBB->pred_begin(); BBI != currentBB->pred_end(); BBI++ ){
+            if ((OuterLoop->contains(*BBI)) && 
+                (visitedBBs.find(*BBI)==visitedBBs.end()) &&
+                (predBBs.find(*BBI)==predBBs.end())){
+               predBBs.insert(*BBI);
+            }
+          }
+        }
+        currentBBs = predBBs;
+        if (currentBBs.empty()){
+          llvm::outs()<<"BOLT-ERROR: doesn't contain demand load\n";
+          return false;
+        }
+      }
+      else if (potentialDemandLoads.size()>1){
+         llvm::outs()<<"BOLT-ERROR: contains more than 1 demand load!\n";
+         return false;
+      }
+      else {
+        DemandLoadInstr = potentialDemandLoads[0];
+        break;
+      }
+    }
+  }
+
+  // TODO: need to check the MCInsts after TopLLCMissInstr in the TopLLCMissBB
+
 
   // get the loop header and check if the header is in
   // the loop we want
@@ -199,6 +265,9 @@ bool InjectPrefetchPass::runOnFunction(BinaryFunction &BF) {
        else if (BC.MIB->isCMP(Inst)){
           if (DemandLoadInstr.getOperand(3).getReg()==Inst.getOperand(0).getReg()){
             LoopGuardCMPInstr = & Inst;
+          }
+          else if (BC.MIB->isLower32bitReg(DemandLoadInstr.getOperand(3).getReg(), Inst.getOperand(0).getReg())){
+           LoopGuardCMPInstr = & Inst;
           }
        }
     }
