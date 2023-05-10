@@ -160,7 +160,6 @@ bool InjectPrefetchPass::runOnFunction(BinaryFunction &BF) {
        }
      }
   }
-  
   // if demandLoad is not in the same BB as the TopLLCMissInstr
   // find the demendLoad in the predcessors of the TopLLCMissBB
   if (potentialDemandLoads.size()!=0){
@@ -263,17 +262,24 @@ bool InjectPrefetchPass::runOnFunction(BinaryFunction &BF) {
           LoopInductionInstr = &Inst;
        }
        else if (BC.MIB->isCMP(Inst)){
-          if (DemandLoadInstr.getOperand(3).getReg()==Inst.getOperand(0).getReg()){
-            LoopGuardCMPInstr = & Inst;
-          }
-          else if (BC.MIB->isLower32bitReg(DemandLoadInstr.getOperand(3).getReg(), Inst.getOperand(0).getReg())){
-           LoopGuardCMPInstr = & Inst;
+          for (int i=0; i<Inst.getNumOperands(); i++){
+            if (Inst.getOperand(i).isReg()){
+              if (DemandLoadInstr.getOperand(3).getReg()==Inst.getOperand(i).getReg()){
+                LoopGuardCMPInstr = & Inst;
+              }
+              else if (BC.MIB->isLower32bitReg(DemandLoadInstr.getOperand(3).getReg(), Inst.getOperand(i).getReg())){
+                LoopGuardCMPInstr = & Inst;
+              }
+            }
           }
        }
     }
   }
 
-
+  if (LoopGuardCMPInstr==NULL) {
+    llvm::outs()<<"BOLT-ERROR: LoopGuardCMPInstr doesn't exist\n";
+    return false;
+  }
 
   // before we change the CFG of this function to add the 
   // BoundCHeckBB and PrefetchBB, we need to save all the 
@@ -324,24 +330,47 @@ bool InjectPrefetchPass::runOnFunction(BinaryFunction &BF) {
   BC.MIB->createADD64ri32(AddInstr, BC.MIB->getX86RAX(), BC.MIB->getX86RAX(), prefetchDist);
   BoundCheckBBs.back()->addInstruction(AddInstr);
 
+
   // create comparison instruction
-  // cmp 0x18(%rsp), %rax
+  // cmp 0x18(%rsp), %rax -> cmp 0x20(%rsp), %rax
   int NumOperandsCMP = LoopGuardCMPInstr->getNumOperands();
   MCInst CMPInstr;
   CMPInstr.setOpcode(LoopGuardCMPInstr->getOpcode());
+
+  // check if the CMP instr contains %rsp
+  bool hasRSP = false;
   for (int i=0; i<NumOperandsCMP; i++){
-    if (i==0){
-      CMPInstr.addOperand(MCOperand::createReg(BC.MIB->getX86RAX()));
+    if (LoopGuardCMPInstr->getOperand(i).isReg()){
+      if (LoopGuardCMPInstr->getOperand(i).getReg()==BC.MIB->getStackPointer()){
+        hasRSP = true;
+      }
     }
-    else if (i==4){
-      int64_t newDisp = LoopGuardCMPInstr->getOperand(i).getImm() + 8;
-      CMPInstr.addOperand(MCOperand::createImm(newDisp));
+  }
+
+  for (int i=0; i<NumOperandsCMP; i++){
+    if (LoopGuardCMPInstr->getOperand(i).isReg()){
+      if (DemandLoadInstr.getOperand(3).getReg()==LoopGuardCMPInstr->getOperand(i).getReg()){
+        CMPInstr.addOperand(MCOperand::createReg(BC.MIB->getX86RAX()));
+      }
+      else if (BC.MIB->isLower32bitReg(DemandLoadInstr.getOperand(3).getReg(), LoopGuardCMPInstr->getOperand(i).getReg())){
+        CMPInstr.addOperand(MCOperand::createReg(BC.MIB->getX86RAX()));
+      }
+      else {
+        CMPInstr.addOperand(LoopGuardCMPInstr->getOperand(i));
+      }
     }
-    else{
-      CMPInstr.addOperand(LoopGuardCMPInstr->getOperand(i));
+    else {
+      if (LoopGuardCMPInstr->getOperand(i).isImm()){
+        int64_t newDisp = LoopGuardCMPInstr->getOperand(i).getImm() + 8;
+        CMPInstr.addOperand(MCOperand::createImm(newDisp));
+      }
+      else{
+        CMPInstr.addOperand(LoopGuardCMPInstr->getOperand(i));
+      }
     }
   }
   BoundCheckBBs.back()->addInstruction(CMPInstr);
+
   // create unconditional branch at the end of this basic block
   //BoundCheckBBs.back()->addBranchInstruction(HeaderBB);
 
@@ -353,7 +382,6 @@ bool InjectPrefetchPass::runOnFunction(BinaryFunction &BF) {
   for (unsigned i=0; i<PredsOfHeaderBB.size(); i++){
     PredsOfHeaderBB[i]->addSuccessor(BoundsCheckBB);
   }
-
 
 
   // create prefetchBB
