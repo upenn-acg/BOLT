@@ -92,7 +92,6 @@ bool InjectPrefetchPass::runOnFunction(BinaryFunction &BF) {
   // get outer most loops in the function
   for (auto I = BF.BLI->begin(), E = BF.BLI->end(); I != E; ++I) {
     OuterLoops.push_back(*I);
-    ++BF.BLI->OuterLoops;
   }
 
   std::vector<BinaryLoop*> LoopsContainTopLLCMissBB;
@@ -104,14 +103,11 @@ bool InjectPrefetchPass::runOnFunction(BinaryFunction &BF) {
     BF.BLI->MaximumDepth = std::max(L->getLoopDepth(), BF.BLI->MaximumDepth);
 
     bool containTopLLCMissBB = false;
-    for (BinaryBasicBlock *BB : L->getBlocks()){
-      if (BB==TopLLCMissBB){
-        containTopLLCMissBB = true;
-        LoopsContainTopLLCMissBB.push_back(L);
-        OuterLoops.clear();
-        break;    
-      }
-    }  
+    if (L->contains(TopLLCMissBB)){
+      containTopLLCMissBB = true;
+      LoopsContainTopLLCMissBB.push_back(L);
+      OuterLoops.clear();
+    }
 
     // get inner loops of the current outer loop.
     // set these inner loops to be the new round 
@@ -128,101 +124,37 @@ bool InjectPrefetchPass::runOnFunction(BinaryFunction &BF) {
 
   // if the top LLC miss instruction doesn't exist in 
   // a nested loop, we are not going to inject prefetch
-  if (LoopDepth < 2) return false;
-
-  BinaryLoop* OuterLoop = LoopsContainTopLLCMissBB[LoopDepth-2];
-  BinaryLoop* InnerLoop = LoopsContainTopLLCMissBB[LoopDepth-1];
-
-
-  std::vector<MCInst* > Loads;
-  for (BinaryBasicBlock *BB : OuterLoop->getBlocks()){
-    for (auto It = BB->begin(); It != BB->end(); It++){
-      MCInst &Instr = *It;
-      if (BC.MIB->isLoad(Instr)){
-        Loads.push_back(&Instr);
-      }
-    }
-  }  
-
-  // based on TopLLCMissInstr, decide the DemandLoadInstr
-  unsigned DemandLoadDstRegNum = TopLLCMissInstr->getOperand(1).getReg();
-
-  // check if the demandLoad is in the same BB
-  std::vector<MCInst> potentialDemandLoads;
-  for (auto It = TopLLCMissBB->begin(); It != TopLLCMissBB->end(); It++){
-     MCInst &Instr = *It;
-     if (BC.MIB->hasAnnotation(Instr, "AbsoluteAddr")){
-       uint64_t AbsoluteAddr = (uint64_t)BC.MIB->getAnnotationAs<uint64_t>(Instr, "AbsoluteAddr");
-       if (AbsoluteAddr < TopLLCMissAddr){
-         if ((BC.MIB->isLoad(Instr)) && (Instr.getOperand(0).getReg()==DemandLoadDstRegNum)){
-            potentialDemandLoads.push_back(Instr);
-         }
-       }
-     }
-  }
-  // if demandLoad is not in the same BB as the TopLLCMissInstr
-  // find the demendLoad in the predcessors of the TopLLCMissBB
-  if (potentialDemandLoads.size()!=0){
-    DemandLoadInstr = potentialDemandLoads.back();
-  }
-  else {
-    std::unordered_set<BinaryBasicBlock* > currentBBs;
-    std::unordered_set<BinaryBasicBlock*> visitedBBs;
-    visitedBBs.insert(TopLLCMissBB);
-    for (auto BBI = TopLLCMissBB->pred_begin(); BBI != TopLLCMissBB->pred_end(); BBI++ ){
-      BinaryBasicBlock* BB = *BBI;
-      if (OuterLoop->contains(BB)){
-        if (currentBBs.find(*BBI)==currentBBs.end()){
-          currentBBs.insert(*BBI);
-        }
-      }
-    }
-    while (true){
-      for (auto it = currentBBs.begin(); it != currentBBs.end(); it++){
-        BinaryBasicBlock* currentBB = *it;
-        visitedBBs.insert(currentBB);
-        
-        MCInst* DemandLoadInThisBB = NULL;
-        for (auto It = currentBB->begin(); It != currentBB->end(); It++){
-          MCInst &Instr = *It;
-          if ((BC.MIB->isLoad(Instr)) && (Instr.getOperand(0).getReg()==DemandLoadDstRegNum)){
-             DemandLoadInThisBB = &Instr;
-          }
-        }
-        if (DemandLoadInThisBB != NULL){
-          potentialDemandLoads.push_back(*DemandLoadInThisBB); 
-        }
-      }
-      if (potentialDemandLoads.size()==0){
-        std::unordered_set<BinaryBasicBlock* > predBBs;
-        for (auto It = currentBBs.begin(); It != currentBBs.end(); It++){
-          BinaryBasicBlock* currentBB = *It;
-          for (auto BBI = currentBB->pred_begin(); BBI != currentBB->pred_end(); BBI++ ){
-            if ((OuterLoop->contains(*BBI)) && 
-                (visitedBBs.find(*BBI)==visitedBBs.end()) &&
-                (predBBs.find(*BBI)==predBBs.end())){
-               predBBs.insert(*BBI);
-            }
-          }
-        }
-        currentBBs = predBBs;
-        if (currentBBs.empty()){
-          llvm::outs()<<"BOLT-ERROR: doesn't contain demand load\n";
-          return false;
-        }
-      }
-      else if (potentialDemandLoads.size()>1){
-         llvm::outs()<<"BOLT-ERROR: contains more than 1 demand load!\n";
-         return false;
-      }
-      else {
-        DemandLoadInstr = potentialDemandLoads[0];
-        break;
-      }
-    }
+  if (LoopDepth < 2) {
+    llvm::outs()<<"[InjectPrefetchPass] The outer loop that contains top LLC miss BB doesn't exist\n";
+    return false;
   }
 
-  // TODO: need to check the MCInsts after TopLLCMissInstr in the TopLLCMissBB
+  BinaryLoop* OuterLoop;
+  BinaryLoop* InnerLoop;
+
+  int currentDepth = LoopDepth - 2;
+  while (currentDepth >= 0){
+    OuterLoop = LoopsContainTopLLCMissBB[currentDepth];
+    InnerLoop = LoopsContainTopLLCMissBB[currentDepth+1];
+    SmallVector<BinaryBasicBlock *, 1> OuterLoopLatches;
+    OuterLoop->getLoopLatches(OuterLoopLatches);
+    SmallVector<BinaryBasicBlock *, 1> InnerLoopLatches;
+    InnerLoop->getLoopLatches(InnerLoopLatches);
+    if (OuterLoopLatches == InnerLoopLatches){
+       currentDepth--; 
+       OuterLoop = NULL;
+       InnerLoop = NULL;
+    }
+    else break;
+  }
+
+  if (OuterLoop == NULL){
+    llvm::outs()<<"[InjectPrefetchPass] The outer loop that contains top LLC miss BB doesn't exist\n";
+    return false;
+  }
+
+  MCInst* DemandLoadInstrP = findDemandLoad(BF, OuterLoop, TopLLCMissInstr, TopLLCMissBB);
+  DemandLoadInstr = *DemandLoadInstrP;
 
 
   // get the loop header and check if the header is in
@@ -262,7 +194,7 @@ bool InjectPrefetchPass::runOnFunction(BinaryFunction &BF) {
           LoopInductionInstr = &Inst;
        }
        else if (BC.MIB->isCMP(Inst)){
-          for (int i=0; i<Inst.getNumOperands(); i++){
+          for (unsigned i=0; i<Inst.getNumOperands(); i++){
             if (Inst.getOperand(i).isReg()){
               if (DemandLoadInstr.getOperand(3).getReg()==Inst.getOperand(i).getReg()){
                 LoopGuardCMPInstr = & Inst;
@@ -371,9 +303,6 @@ bool InjectPrefetchPass::runOnFunction(BinaryFunction &BF) {
   }
   BoundCheckBBs.back()->addInstruction(CMPInstr);
 
-  // create unconditional branch at the end of this basic block
-  //BoundCheckBBs.back()->addBranchInstruction(HeaderBB);
-
   // insert this Basic Block to binary function
   BF.insertBasicBlocks(PredsOfHeaderBB[1], std::move(BoundCheckBBs));
 
@@ -443,7 +372,7 @@ bool InjectPrefetchPass::runOnFunction(BinaryFunction &BF) {
   BoundsCheckBB->addInstruction(BoundsCheckBranch);
 
   // change HeaderBB's original predecessors' tail branch targets
-  for (int i=0; i<PredsOfHeaderBB.size(); i++){
+  for (unsigned i=0; i<PredsOfHeaderBB.size(); i++){
     MCInst* LastBranch = PredsOfHeaderBB[i]->getLastNonPseudoInstr();
     const MCExpr* LastBranchTargetExpr = LastBranch->getOperand(0).getExpr();
     const MCSymbol* LastBranchTargetSymbol = BC.MIB->getTargetSymbol(LastBranchTargetExpr);
@@ -454,6 +383,106 @@ bool InjectPrefetchPass::runOnFunction(BinaryFunction &BF) {
 
   return true;
 }
+
+
+MCInst* InjectPrefetchPass::findDemandLoad(BinaryFunction& BF,
+                                           BinaryLoop* OuterLoop, 
+                                           MCInst* DstLoad, 
+                                           BinaryBasicBlock* DstLoadBB){
+
+  BinaryContext& BC = BF.getBinaryContext();
+  uint64_t DstLoadAddr = (uint64_t)BC.MIB->getAnnotationAs<uint64_t>(*DstLoad, "AbsoluteAddr");
+  MCInst* DemandLoadInstr = NULL;
+
+  // based on TopLLCMissInstr, decide the DemandLoadInstr
+  unsigned DemandLoadDstRegNum = DstLoad->getOperand(1).getReg();
+
+  // check if the demandLoad is in the same BB
+  std::vector<MCInst*> potentialDemandLoadsBefore;
+  std::vector<MCInst*> potentialDemandLoadsAfter;
+  for (auto It = DstLoadBB->begin(); It != DstLoadBB->end(); It++){
+     MCInst &Instr = *It;
+     if (BC.MIB->hasAnnotation(Instr, "AbsoluteAddr")){
+       uint64_t AbsoluteAddr = (uint64_t)BC.MIB->getAnnotationAs<uint64_t>(Instr, "AbsoluteAddr");
+       if (AbsoluteAddr < DstLoadAddr){
+         if ((BC.MIB->isLoad(Instr)) && (Instr.getOperand(0).getReg()==DemandLoadDstRegNum)){
+            potentialDemandLoadsBefore.push_back(&Instr);
+         }
+       }
+       else if (AbsoluteAddr > DstLoadAddr){
+         if ((BC.MIB->isLoad(Instr)) && (Instr.getOperand(0).getReg()==DemandLoadDstRegNum)){
+            potentialDemandLoadsAfter.push_back(&Instr);
+         }
+       }
+     }
+  }
+  // if demandLoad is not in the same BB as the TopLLCMissInstr
+  // find the demendLoad in the predcessors of the TopLLCMissBB
+  if (potentialDemandLoadsBefore.size()!=0){
+    DemandLoadInstr = potentialDemandLoadsBefore.back();
+  }
+  else {
+    std::unordered_set<BinaryBasicBlock* > currentBBs;
+    std::unordered_set<BinaryBasicBlock*> visitedBBs;
+    visitedBBs.insert(DstLoadBB);
+    for (auto BBI = DstLoadBB->pred_begin(); BBI != DstLoadBB->pred_end(); BBI++ ){
+      BinaryBasicBlock* BB = *BBI;
+      if (OuterLoop->contains(BB)){
+        if (currentBBs.find(*BBI)==currentBBs.end()){
+          currentBBs.insert(*BBI);
+        }
+      }
+    }
+    while (true){
+      for (auto it = currentBBs.begin(); it != currentBBs.end(); it++){
+        BinaryBasicBlock* currentBB = *it;
+        visitedBBs.insert(currentBB);
+        
+        MCInst* DemandLoadInThisBB = NULL;
+        for (auto It = currentBB->begin(); It != currentBB->end(); It++){
+          MCInst &Instr = *It;
+          if ((BC.MIB->isLoad(Instr)) && (Instr.getOperand(0).getReg()==DemandLoadDstRegNum)){
+             DemandLoadInThisBB = &Instr;
+          }
+        }
+        if (DemandLoadInThisBB != NULL){
+          potentialDemandLoadsBefore.push_back(DemandLoadInThisBB); 
+        }
+      }
+      if (potentialDemandLoadsBefore.size()==0){
+        std::unordered_set<BinaryBasicBlock* > predBBs;
+        for (auto It = currentBBs.begin(); It != currentBBs.end(); It++){
+          BinaryBasicBlock* currentBB = *It;
+          for (auto BBI = currentBB->pred_begin(); BBI != currentBB->pred_end(); BBI++ ){
+            if ((OuterLoop->contains(*BBI)) && 
+                (visitedBBs.find(*BBI)==visitedBBs.end()) &&
+                (predBBs.find(*BBI)==predBBs.end())){
+               predBBs.insert(*BBI);
+            }
+          }
+        }
+        currentBBs = predBBs;
+        if (currentBBs.empty()){
+          if (potentialDemandLoadsBefore.size()!=0){
+            DemandLoadInstr = potentialDemandLoadsAfter.back();
+          }
+          break;
+        }
+      }
+      else if (potentialDemandLoadsBefore.size()>1){
+         llvm::outs()<<"BOLT-ERROR: contains more than 1 demand load!\n";
+         break;
+      }
+      else {
+        DemandLoadInstr = potentialDemandLoadsBefore[0];
+        break;
+      }
+    }
+  }
+
+  return DemandLoadInstr;
+}
+
 
 std::vector<std::string> InjectPrefetchPass::splitLine(std::string str){
    std::vector<std::string> words;

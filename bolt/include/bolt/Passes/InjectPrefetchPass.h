@@ -19,12 +19,15 @@ public:
   explicit InjectPrefetchPass() : BinaryFunctionPass(false) {}
 
   const char *getName() const override { return "inject-prefetch"; }
-  /// Pass entry point
+  /// Helper functions
   std::unordered_map<std::string, uint64_t> getTopLLCMissLocationFromFile();
   std::vector<std::string> splitLine(std::string);
   std::string removeSuffix(std::string);
+  /// real functions
   void runOnFunctions(BinaryContext &BC) override;
   bool runOnFunction(BinaryFunction &Function);
+  MCInst* findDemandLoad(BinaryFunction&, BinaryLoop*, 
+                         MCInst*, BinaryBasicBlock*);
 
 private:
   std::unordered_map<std::string, uint64_t> TopLLCMissLocations;
