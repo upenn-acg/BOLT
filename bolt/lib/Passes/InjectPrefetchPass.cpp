@@ -52,7 +52,6 @@ bool InjectPrefetchPass::runOnFunction(BinaryFunction &BF) {
   // the TOP LLC miss instruction. 
   BinaryBasicBlock* TopLLCMissBB;
   MCInst* TopLLCMissInstr;
-  MCInst DemandLoadInstr;
 
   for (auto BBI = BF.begin(); BBI != BF.end(); BBI ++){
     BinaryBasicBlock &BB = *BBI;
@@ -78,83 +77,14 @@ bool InjectPrefetchPass::runOnFunction(BinaryFunction &BF) {
     }
   }
 
-
-  // get loop info of this function
-  BF.updateLayoutIndices();
-
-  BinaryDominatorTree DomTree;
-  DomTree.recalculate(BF);
-  BF.BLI.reset(new BinaryLoopInfo());
-  BF.BLI->analyze(DomTree);
-
-  std::vector<BinaryLoop *> OuterLoops;
-
-  // get outer most loops in the function
-  for (auto I = BF.BLI->begin(), E = BF.BLI->end(); I != E; ++I) {
-    OuterLoops.push_back(*I);
-  }
-
-  std::vector<BinaryLoop*> LoopsContainTopLLCMissBB;
-  while (!OuterLoops.empty()) {
-    BinaryLoop *L = OuterLoops.back();
-    OuterLoops.pop_back();
-
-    ++BF.BLI->TotalLoops;
-    BF.BLI->MaximumDepth = std::max(L->getLoopDepth(), BF.BLI->MaximumDepth);
-
-    bool containTopLLCMissBB = false;
-    if (L->contains(TopLLCMissBB)){
-      containTopLLCMissBB = true;
-      LoopsContainTopLLCMissBB.push_back(L);
-      OuterLoops.clear();
-    }
-
-    // get inner loops of the current outer loop.
-    // set these inner loops to be the new round 
-    // of outer loops
-    if (containTopLLCMissBB){
-      for (BinaryLoop::iterator I = L->begin(), E = L->end(); I != E; ++I){
-        OuterLoops.push_back(*I);
-      }
-    } 
-  }
-
-  int LoopDepth = (int)LoopsContainTopLLCMissBB.size();
-  llvm::outs()<<"[InjectPrefetchPass] the depth of nested Loop that contains TopLLCMissBB is "<<LoopDepth<<"\n";
-
-  // if the top LLC miss instruction doesn't exist in 
-  // a nested loop, we are not going to inject prefetch
-  if (LoopDepth < 2) {
-    llvm::outs()<<"[InjectPrefetchPass] The outer loop that contains top LLC miss BB doesn't exist\n";
-    return false;
-  }
-
-  BinaryLoop* OuterLoop;
-  BinaryLoop* InnerLoop;
-
-  int currentDepth = LoopDepth - 2;
-  while (currentDepth >= 0){
-    OuterLoop = LoopsContainTopLLCMissBB[currentDepth];
-    InnerLoop = LoopsContainTopLLCMissBB[currentDepth+1];
-    SmallVector<BinaryBasicBlock *, 1> OuterLoopLatches;
-    OuterLoop->getLoopLatches(OuterLoopLatches);
-    SmallVector<BinaryBasicBlock *, 1> InnerLoopLatches;
-    InnerLoop->getLoopLatches(InnerLoopLatches);
-    if (OuterLoopLatches == InnerLoopLatches){
-       currentDepth--; 
-       OuterLoop = NULL;
-       InnerLoop = NULL;
-    }
-    else break;
-  }
-
+  BinaryLoop* OuterLoop = getOuterLoopForBB (BF, TopLLCMissBB);
   if (OuterLoop == NULL){
     llvm::outs()<<"[InjectPrefetchPass] The outer loop that contains top LLC miss BB doesn't exist\n";
     return false;
   }
 
   MCInst* DemandLoadInstrP = findDemandLoad(BF, OuterLoop, TopLLCMissInstr, TopLLCMissBB);
-  DemandLoadInstr = *DemandLoadInstrP;
+  MCInst DemandLoadInstr = *DemandLoadInstrP;
 
 
   // get the loop header and check if the header is in
@@ -247,9 +177,9 @@ bool InjectPrefetchPass::runOnFunction(BinaryFunction &BF) {
 
   // add instructions
   // create push %rax 
-  MCInst PushInst2; 
-  BC.MIB->createPushRegister(PushInst2, BC.MIB->getX86RAX(), 8);
-  BoundCheckBBs.back()->addInstruction(PushInst2);
+  MCInst PushInst; 
+  BC.MIB->createPushRegister(PushInst, BC.MIB->getX86RAX(), 8);
+  BoundCheckBBs.back()->addInstruction(PushInst);
 
   // create mov %rdx, %rax
   MCInst MovInstr;
@@ -382,6 +312,65 @@ bool InjectPrefetchPass::runOnFunction(BinaryFunction &BF) {
   }
 
   return true;
+}
+
+
+BinaryLoop* InjectPrefetchPass::getOuterLoopForBB( BinaryFunction& BF,
+                                                   BinaryBasicBlock* TopLLCMissBB){
+  // get loop info of this function
+  BF.updateLayoutIndices();
+
+  BinaryDominatorTree DomTree;
+  DomTree.recalculate(BF);
+  BF.BLI.reset(new BinaryLoopInfo());
+  BF.BLI->analyze(DomTree);
+
+  std::vector<BinaryLoop *> OuterLoops;
+  BinaryLoop* OuterLoop = NULL;
+
+  // get outer most loops in the function
+  for (auto I = BF.BLI->begin(), E = BF.BLI->end(); I != E; ++I) {
+    OuterLoops.push_back(*I);
+  }
+
+  std::vector<BinaryLoop*> LoopsContainTopLLCMissBB;
+  while (!OuterLoops.empty()) {
+    BinaryLoop *L = OuterLoops.back();
+    OuterLoops.pop_back();
+
+    ++BF.BLI->TotalLoops;
+    BF.BLI->MaximumDepth = std::max(L->getLoopDepth(), BF.BLI->MaximumDepth);
+
+    bool containTopLLCMissBB = false;
+    if (L->contains(TopLLCMissBB)){
+      containTopLLCMissBB = true;
+      LoopsContainTopLLCMissBB.push_back(L);
+      OuterLoops.clear();
+    }
+
+    // get inner loops of the current outer loop.
+    // set these inner loops to be the new round 
+    // of outer loops
+    if (containTopLLCMissBB){
+      for (BinaryLoop::iterator I = L->begin(), E = L->end(); I != E; ++I){
+        OuterLoops.push_back(*I);
+      }
+    } 
+  }
+
+  int LoopDepth = (int)LoopsContainTopLLCMissBB.size();
+  llvm::outs()<<"[InjectPrefetchPass] the depth of nested Loop that contains TopLLCMissBB is "<<LoopDepth<<"\n";
+
+  // if the top LLC miss instruction doesn't exist in 
+  // a nested loop, we are not going to inject prefetch
+  if (LoopDepth < 2) {
+    llvm::outs()<<"[InjectPrefetchPass] The outer loop that contains top LLC miss BB doesn't exist\n";
+    return OuterLoop;
+  }
+
+  OuterLoop = LoopsContainTopLLCMissBB[LoopDepth-2];
+
+  return OuterLoop;
 }
 
 

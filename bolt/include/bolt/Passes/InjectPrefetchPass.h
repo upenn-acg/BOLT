@@ -26,8 +26,10 @@ public:
   /// real functions
   void runOnFunctions(BinaryContext &BC) override;
   bool runOnFunction(BinaryFunction &Function);
-  MCInst* findDemandLoad(BinaryFunction&, BinaryLoop*, 
-                         MCInst*, BinaryBasicBlock*);
+  MCInst* findDemandLoad( BinaryFunction&, BinaryLoop*, 
+                          MCInst*, BinaryBasicBlock*);
+  BinaryLoop* getOuterLoopForBB( BinaryFunction&, 
+                                 BinaryBasicBlock*);
 
 private:
   std::unordered_map<std::string, uint64_t> TopLLCMissLocations;
