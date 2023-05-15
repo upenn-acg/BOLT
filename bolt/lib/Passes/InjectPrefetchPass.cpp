@@ -83,9 +83,31 @@ bool InjectPrefetchPass::runOnFunction(BinaryFunction &BF) {
     return false;
   }
 
-  MCInst* DemandLoadInstrP = findDemandLoad(BF, OuterLoop, TopLLCMissInstr, TopLLCMissBB);
-  MCInst DemandLoadInstr = *DemandLoadInstrP;
+  std::set<MCRegister> DstRegsInOuterLoop;
+  for (BinaryBasicBlock *BB : OuterLoop->getBlocks()){
+    for (auto It = BB->begin(); It != BB->end(); It++){
+      MCInst &Instr = *It;
+      if ((BC.MIB->isLoad(Instr))&&(TopLLCMissInstr!= (&Instr))){
+        MCRegister DstReg = Instr.getOperand(0).getReg();
+        if (DstRegsInOuterLoop.find(DstReg)==DstRegsInOuterLoop.end()){
+          DstRegsInOuterLoop.insert(DstReg);
+        }
+      }
+    }
+  }  
 
+  std::vector<MCInst*> predLoadInstrs;
+  MCInst* predLoad = TopLLCMissInstr;
+  BinaryBasicBlock* predLoadBB = TopLLCMissBB;
+  while (DstRegsInOuterLoop.find(predLoad->getOperand(1).getReg()) != DstRegsInOuterLoop.end()){
+    predLoadInstrs.push_back(predLoad);
+    auto newDemandLoadPkg = findDemandLoad(BF, OuterLoop, predLoad, predLoadBB);
+    predLoad = newDemandLoadPkg.first;
+    predLoadBB = newDemandLoadPkg.second;
+  }
+  predLoadInstrs.push_back(predLoad);
+ 
+  MCInst DemandLoadInstr = *(predLoadInstrs[1]);
 
   // get the loop header and check if the header is in
   // the loop we want
@@ -257,6 +279,27 @@ bool InjectPrefetchPass::runOnFunction(BinaryFunction &BF) {
   // for prefetch
   // then load prefetch target's address
   // mov 0x200(%r9,%rdx,8),%rax 
+
+  for (unsigned idx = predLoadInstrs.size()-1 ; idx > 1 ; idx --){
+    int numOperands = predLoadInstrs[idx]->getNumOperands();
+    MCInst predLoad;
+    predLoad.setOpcode(predLoadInstrs[idx]->getOpcode());
+    for (int i=0; i<numOperands; i++){
+      if (i==4){
+        if (predLoadInstrs[idx]->getOperand(1).getReg()==BC.MIB->getStackPointer()){
+           predLoad.addOperand(MCOperand::createImm(predLoadInstrs[idx]->getOperand(4).getImm()+8));
+        }
+        else {
+          predLoad.addOperand(predLoadInstrs[idx]->getOperand(i));
+        }
+      }
+      else{
+        predLoad.addOperand(predLoadInstrs[idx]->getOperand(i));
+      }
+    }
+    PrefetchBBs.back()->addInstruction(predLoad);  
+  }
+
   int numOperands = DemandLoadInstr.getNumOperands();
   MCInst LoadPrefetchAddrInstr;
   LoadPrefetchAddrInstr.setOpcode(DemandLoadInstr.getOpcode());
@@ -274,7 +317,6 @@ bool InjectPrefetchPass::runOnFunction(BinaryFunction &BF) {
      }
   }
   PrefetchBBs.back()->addInstruction(LoadPrefetchAddrInstr);
-
   // prefetcht0 (%rax) 
   MCInst PrefetchInst;
   BC.MIB->createPrefetchT0(PrefetchInst, BC.MIB->getX86RAX(), 0, BC.MIB->getNoRegister(), 0, BC.MIB->getNoRegister(), LoadPrefetchAddrInstr);
@@ -374,21 +416,22 @@ BinaryLoop* InjectPrefetchPass::getOuterLoopForBB( BinaryFunction& BF,
 }
 
 
-MCInst* InjectPrefetchPass::findDemandLoad(BinaryFunction& BF,
-                                           BinaryLoop* OuterLoop, 
-                                           MCInst* DstLoad, 
-                                           BinaryBasicBlock* DstLoadBB){
+std::pair<MCInst*, BinaryBasicBlock*> InjectPrefetchPass::findDemandLoad(BinaryFunction& BF,
+                                                                         BinaryLoop* OuterLoop, 
+                                                                         MCInst* DstLoad, 
+                                                                         BinaryBasicBlock* DstLoadBB){
 
   BinaryContext& BC = BF.getBinaryContext();
   uint64_t DstLoadAddr = (uint64_t)BC.MIB->getAnnotationAs<uint64_t>(*DstLoad, "AbsoluteAddr");
   MCInst* DemandLoadInstr = NULL;
-
+  BinaryBasicBlock* DemandLoadBB = NULL;
   // based on TopLLCMissInstr, decide the DemandLoadInstr
   unsigned DemandLoadDstRegNum = DstLoad->getOperand(1).getReg();
 
   // check if the demandLoad is in the same BB
   std::vector<MCInst*> potentialDemandLoadsBefore;
   std::vector<MCInst*> potentialDemandLoadsAfter;
+  std::vector<BinaryBasicBlock*> potentialDemandLoadBBs;
   for (auto It = DstLoadBB->begin(); It != DstLoadBB->end(); It++){
      MCInst &Instr = *It;
      if (BC.MIB->hasAnnotation(Instr, "AbsoluteAddr")){
@@ -405,12 +448,13 @@ MCInst* InjectPrefetchPass::findDemandLoad(BinaryFunction& BF,
        }
      }
   }
-  // if demandLoad is not in the same BB as the TopLLCMissInstr
-  // find the demendLoad in the predcessors of the TopLLCMissBB
   if (potentialDemandLoadsBefore.size()!=0){
     DemandLoadInstr = potentialDemandLoadsBefore.back();
+    DemandLoadBB = DstLoadBB;
   }
   else {
+    // if demandLoad is not in the same BB as the TopLLCMissInstr
+    // find the demendLoad in the predcessors of the TopLLCMissBB
     std::unordered_set<BinaryBasicBlock* > currentBBs;
     std::unordered_set<BinaryBasicBlock*> visitedBBs;
     visitedBBs.insert(DstLoadBB);
@@ -436,6 +480,7 @@ MCInst* InjectPrefetchPass::findDemandLoad(BinaryFunction& BF,
         }
         if (DemandLoadInThisBB != NULL){
           potentialDemandLoadsBefore.push_back(DemandLoadInThisBB); 
+          potentialDemandLoadBBs.push_back(currentBB);
         }
       }
       if (potentialDemandLoadsBefore.size()==0){
@@ -454,6 +499,7 @@ MCInst* InjectPrefetchPass::findDemandLoad(BinaryFunction& BF,
         if (currentBBs.empty()){
           if (potentialDemandLoadsBefore.size()!=0){
             DemandLoadInstr = potentialDemandLoadsAfter.back();
+            DemandLoadBB = DstLoadBB;
           }
           break;
         }
@@ -464,12 +510,13 @@ MCInst* InjectPrefetchPass::findDemandLoad(BinaryFunction& BF,
       }
       else {
         DemandLoadInstr = potentialDemandLoadsBefore[0];
+        DemandLoadBB = potentialDemandLoadBBs[0];
         break;
       }
     }
   }
 
-  return DemandLoadInstr;
+  return std::make_pair(DemandLoadInstr, DemandLoadBB);
 }
 
 

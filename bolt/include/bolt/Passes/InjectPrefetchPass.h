@@ -26,8 +26,8 @@ public:
   /// real functions
   void runOnFunctions(BinaryContext &BC) override;
   bool runOnFunction(BinaryFunction &Function);
-  MCInst* findDemandLoad( BinaryFunction&, BinaryLoop*, 
-                          MCInst*, BinaryBasicBlock*);
+  std::pair<MCInst*, BinaryBasicBlock*> findDemandLoad( BinaryFunction&, BinaryLoop*, 
+                                                        MCInst*, BinaryBasicBlock*);
   BinaryLoop* getOuterLoopForBB( BinaryFunction&, 
                                  BinaryBasicBlock*);
 
