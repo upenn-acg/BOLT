@@ -30,6 +30,8 @@ public:
                                                         MCInst*, BinaryBasicBlock*);
   BinaryLoop* getOuterLoopForBB( BinaryFunction&, 
                                  BinaryBasicBlock*);
+  BinaryBasicBlock* createBoundsCheckBB(BinaryFunction&, BinaryBasicBlock*,
+                                        MCInst*, MCInst, int prefetchDist);
 
 private:
   std::unordered_map<std::string, uint64_t> TopLLCMissLocations;
