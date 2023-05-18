@@ -35,8 +35,6 @@ namespace bolt {
 
 bool InjectPrefetchPass::runOnFunction(BinaryFunction &BF) {
 
- // if (BF.getOneName() != "_Z7do_workPv") return false;
-
   BinaryContext& BC = BF.getBinaryContext();
   uint64_t startingAddr = BF.getAddress();
   int prefetchDist = 64;
@@ -168,109 +166,13 @@ bool InjectPrefetchPass::runOnFunction(BinaryFunction &BF) {
 
   SmallVector<BinaryBasicBlock*, 0> PredsOfHeaderBB = HeaderBB->getPredecessors();
 
-/*
-  // before we change the CFG of this function to add the 
-  // BoundCHeckBB and PrefetchBB, we need to save all the 
-  // predecessors of the HeaderBB   
-
-  SmallVector<BinaryBasicBlock*, 0> PredsOfHeaderBB = HeaderBB->getPredecessors();
-  for (unsigned i=0; i<PredsOfHeaderBB.size(); i++){
-    PredsOfHeaderBB[i]->removeSuccessor(HeaderBB);
-  }
-  HeaderBB->removeAllPredecessors();
-
-
-
-  // create the boundary check basic block
-  // in this BB, it contains the following 4 instructions
-  // push %rax
-  // mov %rdx, %rax
-  // add 0x20, %rax
-  // cmp 0x18(%rsp), rax
-  // jz 0xa1(%rip)
-  MCSymbol *BoundsCheckLabel = BC.Ctx->createNamedTempSymbol("BoundaryCheckBB");
-
-  std::vector<std::unique_ptr<BinaryBasicBlock>> BoundCheckBBs;
-  BoundCheckBBs.emplace_back(BF.createBasicBlock(BinaryBasicBlock::INVALID_OFFSET, BoundsCheckLabel));
-
-  // add predecessor  
-  for (unsigned i=0; i<PredsOfHeaderBB.size(); i++){
-    BinaryBasicBlock* PredOfHeaderBB = PredsOfHeaderBB[i];
-    BoundCheckBBs.back()->addPredecessor(PredOfHeaderBB);
-  }
-  // add successor
-  BoundCheckBBs.back()->addSuccessor(HeaderBB, 0,0);
-
-  // add instructions
-  // create push %rax 
-  MCInst PushInst; 
-  BC.MIB->createPushRegister(PushInst, BC.MIB->getX86RAX(), 8);
-  BoundCheckBBs.back()->addInstruction(PushInst);
-
-  // create mov %rdx, %rax
-  MCInst MovInstr;
-  BC.MIB->createMOV64rr(MovInstr, BC.MIB->getX86RDX(), BC.MIB->getX86RAX());
-  BoundCheckBBs.back()->addInstruction(MovInstr);
-
-  // create add %rax 0x20
-  int prefetchDist = 64;
-  MCInst AddInstr;
-  BC.MIB->createADD64ri32(AddInstr, BC.MIB->getX86RAX(), BC.MIB->getX86RAX(), prefetchDist);
-  BoundCheckBBs.back()->addInstruction(AddInstr);
-
-
-  // create comparison instruction
-  // cmp 0x18(%rsp), %rax -> cmp 0x20(%rsp), %rax
-  int NumOperandsCMP = LoopGuardCMPInstr->getNumOperands();
-  MCInst CMPInstr;
-  CMPInstr.setOpcode(LoopGuardCMPInstr->getOpcode());
-
-  // check if the CMP instr contains %rsp
-  bool hasRSP = false;
-  for (int i=0; i<NumOperandsCMP; i++){
-    if (LoopGuardCMPInstr->getOperand(i).isReg()){
-      if (LoopGuardCMPInstr->getOperand(i).getReg()==BC.MIB->getStackPointer()){
-        hasRSP = true;
-      }
-    }
-  }
-
-  for (int i=0; i<NumOperandsCMP; i++){
-    if (LoopGuardCMPInstr->getOperand(i).isReg()){
-      if (DemandLoadInstr.getOperand(3).getReg()==LoopGuardCMPInstr->getOperand(i).getReg()){
-        CMPInstr.addOperand(MCOperand::createReg(BC.MIB->getX86RAX()));
-      }
-      else if (BC.MIB->isLower32bitReg(DemandLoadInstr.getOperand(3).getReg(), LoopGuardCMPInstr->getOperand(i).getReg())){
-        CMPInstr.addOperand(MCOperand::createReg(BC.MIB->getX86RAX()));
-      }
-      else {
-        CMPInstr.addOperand(LoopGuardCMPInstr->getOperand(i));
-      }
-    }
-    else {
-      if (LoopGuardCMPInstr->getOperand(i).isImm()){
-        int64_t newDisp = LoopGuardCMPInstr->getOperand(i).getImm() + 8;
-        CMPInstr.addOperand(MCOperand::createImm(newDisp));
-      }
-      else{
-        CMPInstr.addOperand(LoopGuardCMPInstr->getOperand(i));
-      }
-    }
-  }
-  BoundCheckBBs.back()->addInstruction(CMPInstr);
-
-  // insert this Basic Block to binary function
-  BF.insertBasicBlocks(PredsOfHeaderBB[1], std::move(BoundCheckBBs));
-
-  BinaryBasicBlock* BoundsCheckBB = BF.getBasicBlockForLabel(BoundsCheckLabel);    
-*/
   BinaryBasicBlock* BoundsCheckBB = createBoundsCheckBB(BF, HeaderBB, 
                                                         LoopGuardCMPInstr, 
                                                         DemandLoadInstr, 
                                                         prefetchDist);
 
 
-
+/*
   // create prefetchBB
   // in prefetchBB it contains
   // mov 0x200(%r9,%rdx,8),%rax 
@@ -335,6 +237,10 @@ bool InjectPrefetchPass::runOnFunction(BinaryFunction &BF) {
 
   // add PrefetchBB to be the successor of the BoundsCheckBB
   BinaryBasicBlock* PrefetchBB = BF.getBasicBlockForLabel(PrefetchBBLabel);    
+*/
+  BinaryBasicBlock* PrefetchBB = createPrefetchBB(BF, HeaderBB, BoundsCheckBB, 
+                                                  predLoadInstrs, prefetchDist);
+
   BoundsCheckBB->addSuccessor(PrefetchBB);
 
   // add Predecessors to HeaderBB
@@ -638,7 +544,81 @@ BinaryBasicBlock* InjectPrefetchPass::createBoundsCheckBB(BinaryFunction& BF,
 }
 
 
+BinaryBasicBlock* InjectPrefetchPass::createPrefetchBB(BinaryFunction& BF,
+                                      BinaryBasicBlock* HeaderBB,
+                                      BinaryBasicBlock* BoundsCheckBB,
+                                      std::vector<MCInst*> predLoadInstrs,
+                                      int prefetchDist){
 
+  BinaryContext& BC = BF.getBinaryContext();
+  MCInst DemandLoadInstr = *(predLoadInstrs[1]); 
+  // create prefetchBB
+  // in prefetchBB it contains
+  // mov 0x200(%r9,%rdx,8),%rax 
+  // prefetcht0 (%rax) 
+  MCSymbol *PrefetchBBLabel = BC.Ctx->createNamedTempSymbol("PrefetchBB");
+  std::vector<std::unique_ptr<BinaryBasicBlock>> PrefetchBBs;
+  PrefetchBBs.emplace_back(BF.createBasicBlock(BinaryBasicBlock::INVALID_OFFSET, PrefetchBBLabel));
+  PrefetchBBs.back()->addSuccessor(HeaderBB, 0,0);
+  PrefetchBBs.back()->addPredecessor(BoundsCheckBB);
+
+  // add the load instructiona that load the target address
+  // for prefetch
+  // then load prefetch target's address
+  // mov 0x200(%r9,%rdx,8),%rax 
+
+  for (unsigned idx = predLoadInstrs.size()-1 ; idx > 1 ; idx --){
+    int numOperands = predLoadInstrs[idx]->getNumOperands();
+    MCInst predLoad;
+    predLoad.setOpcode(predLoadInstrs[idx]->getOpcode());
+    for (int i=0; i<numOperands; i++){
+      if (i==4){
+        if (predLoadInstrs[idx]->getOperand(1).getReg()==BC.MIB->getStackPointer()){
+           predLoad.addOperand(MCOperand::createImm(predLoadInstrs[idx]->getOperand(4).getImm()+8));
+        }
+        else {
+          predLoad.addOperand(predLoadInstrs[idx]->getOperand(i));
+        }
+      }
+      else{
+        predLoad.addOperand(predLoadInstrs[idx]->getOperand(i));
+      }
+    }
+    PrefetchBBs.back()->addInstruction(predLoad);  
+  }
+
+  int numOperands = DemandLoadInstr.getNumOperands();
+  MCInst LoadPrefetchAddrInstr;
+  LoadPrefetchAddrInstr.setOpcode(DemandLoadInstr.getOpcode());
+  for (int i=0; i<numOperands; i++){
+     if (i==0){
+       // the first operand is the dest reg
+       LoadPrefetchAddrInstr.addOperand(MCOperand::createReg(BC.MIB->getX86RAX())); 
+     }
+     else if (i==4){
+       // the 5th operand is the offset
+       LoadPrefetchAddrInstr.addOperand(MCOperand::createImm(prefetchDist*8));
+     }
+     else{
+       LoadPrefetchAddrInstr.addOperand(DemandLoadInstr.getOperand(i));
+     }
+  }
+  PrefetchBBs.back()->addInstruction(LoadPrefetchAddrInstr);
+  // prefetcht0 (%rax) 
+  MCInst PrefetchInst;
+  BC.MIB->createPrefetchT0(PrefetchInst, BC.MIB->getX86RAX(), 0, BC.MIB->getNoRegister(), 0, BC.MIB->getNoRegister(), LoadPrefetchAddrInstr);
+  PrefetchBBs.back()->addInstruction(PrefetchInst);
+ 
+  // create unconditional branch at the end of 
+  // prefetchBB
+  PrefetchBBs.back()->addBranchInstruction(HeaderBB);  
+  BF.insertBasicBlocks(BoundsCheckBB, std::move(PrefetchBBs));
+
+  // add PrefetchBB to be the successor of the BoundsCheckBB
+  BinaryBasicBlock* PrefetchBB = BF.getBasicBlockForLabel(PrefetchBBLabel);    
+
+  return PrefetchBB;
+}
 
 
 
