@@ -42,6 +42,13 @@ cl::opt<bool>
   cl::init(false), 
   cl::cat(BoltCategory));
 
+cl::opt<unsigned>
+  PrefetchDistance("prefetch-dist",
+  cl::init(64),
+  cl::desc("set the prefetch distance"),
+  cl::ZeroOrMore,
+  cl::cat(BoltCategory));
+
 cl::opt<std::string>
   PrefetchLocationFile("prefetch-location-file",
   cl::desc("file that contains top LLC miss location"),

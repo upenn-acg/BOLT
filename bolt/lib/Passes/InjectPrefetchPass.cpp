@@ -27,7 +27,7 @@ extern cl::OptionCategory BoltCategory;
 
 extern cl::opt<bool> InjectPrefetch;
 extern cl::opt<std::string> PrefetchLocationFile;
-
+extern cl::opt<unsigned> PrefetchDistance;
 } // namespace opts
 
 namespace llvm {
@@ -37,7 +37,7 @@ bool InjectPrefetchPass::runOnFunction(BinaryFunction &BF) {
 
   BinaryContext& BC = BF.getBinaryContext();
   uint64_t startingAddr = BF.getAddress();
-  int prefetchDist = 64;
+  int prefetchDist = opts::PrefetchDistance;
   std::string demangledFuncName = removeSuffix(BF.getDemangledName());
   uint64_t TopLLCMissAddr = TopLLCMissLocations[demangledFuncName];
 
