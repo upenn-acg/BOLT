@@ -151,15 +151,17 @@ bool InjectPrefetchPass::runOnFunction(BinaryFunction &BF) {
           LoopInductionInstr = &Inst;
        }
        else if (BC.MIB->isCMP(Inst)){
-          for (unsigned i=0; i<Inst.getNumOperands(); i++){
-            if (Inst.getOperand(i).isReg()){
-              // the third operand of DemandLoadInstr is the index register
-              // namely the loop induction variable
-              if (DemandLoadInstr.getOperand(3).getReg()==Inst.getOperand(i).getReg()){
-                LoopGuardCMPInstr = & Inst;
-              }
-              else if (BC.MIB->isLower32bitReg(DemandLoadInstr.getOperand(3).getReg(), Inst.getOperand(i).getReg())){
-                LoopGuardCMPInstr = & Inst;
+          if (LoopInductionInstr){
+            for (unsigned i=0; i<Inst.getNumOperands(); i++){
+              if (Inst.getOperand(i).isReg()){
+                // the third operand of DemandLoadInstr is the index register
+                // namely the loop induction variable
+                if (DemandLoadInstr.getOperand(3).getReg()==Inst.getOperand(i).getReg()){
+                  LoopGuardCMPInstr = & Inst;
+                }
+                else if (BC.MIB->isLower32bitReg(DemandLoadInstr.getOperand(3).getReg(), Inst.getOperand(i).getReg())){
+                  LoopGuardCMPInstr = & Inst;
+                }
               }
             }
           }
@@ -484,6 +486,7 @@ BinaryBasicBlock* InjectPrefetchPass::createBoundsCheckBB(BinaryFunction& BF,
   CMPInstr.setOpcode(LoopGuardCMPInstr->getOpcode());
 
   // check if the CMP instr contains %rsp
+  // if it tries to load a value from 
   bool hasRSP = false;
   for (int i=0; i<NumOperandsCMP; i++){
     if (LoopGuardCMPInstr->getOperand(i).isReg()){
@@ -507,7 +510,10 @@ BinaryBasicBlock* InjectPrefetchPass::createBoundsCheckBB(BinaryFunction& BF,
       }
     }
     else {
-      if (LoopGuardCMPInstr->getOperand(i).isImm()){
+      // LoopGuardCMPInstr is a CMP instruction
+      // In CMP instruction, there is only 1 immediate operand
+      // which is the displacement
+      if ((LoopGuardCMPInstr->getOperand(i).isImm())&&(hasRSP)){
         int64_t newDisp = LoopGuardCMPInstr->getOperand(i).getImm() + 8;
         CMPInstr.addOperand(MCOperand::createImm(newDisp));
       }
