@@ -274,6 +274,8 @@ BinaryLoop* InjectPrefetchPass::getOuterLoopForBB( BinaryFunction& BF,
     OuterLoops.push_back(*I);
   }
 
+  // get all loops that contains the TopLLCMissBB
+  // we need the inner most 2 loops
   std::vector<BinaryLoop*> LoopsContainTopLLCMissBB;
   while (!OuterLoops.empty()) {
     BinaryLoop *L = OuterLoops.back();
@@ -286,10 +288,8 @@ BinaryLoop* InjectPrefetchPass::getOuterLoopForBB( BinaryFunction& BF,
       OuterLoops.clear();
     }
 
-    // get inner loops of the current outer loop.
-    // set these inner loops to be the new round 
-    // of outer loops
     if (containTopLLCMissBB){
+      // iterate through all inner loop of the current outer loop
       for (BinaryLoop::iterator I = L->begin(), E = L->end(); I != E; ++I){
         OuterLoops.push_back(*I);
       }
@@ -297,7 +297,6 @@ BinaryLoop* InjectPrefetchPass::getOuterLoopForBB( BinaryFunction& BF,
   }
 
   int LoopDepth = (int)LoopsContainTopLLCMissBB.size();
-  llvm::outs()<<"[InjectPrefetchPass] the depth of nested Loop that contains TopLLCMissBB is "<<LoopDepth<<"\n";
 
   // if the top LLC miss instruction doesn't exist in 
   // a nested loop, we are not going to inject prefetch
@@ -555,11 +554,9 @@ BinaryBasicBlock* InjectPrefetchPass::createPrefetchBB(BinaryFunction& BF,
   PrefetchBBs.back()->addSuccessor(HeaderBB, 0,0);
   PrefetchBBs.back()->addPredecessor(BoundsCheckBB);
 
-  // add the load instructiona that load the target address
-  // for prefetch
-  // then load prefetch target's address
-  // mov 0x200(%r9,%rdx,8),%rax 
-
+  // add the load instructiona that compute the target address
+  // for prefetch. 
+  // Note: here might be a dependency chain. 
   for (unsigned idx = predLoadInstrs.size()-1 ; idx > 1 ; idx --){
     int numOperands = predLoadInstrs[idx]->getNumOperands();
     MCInst predLoad;
@@ -580,6 +577,8 @@ BinaryBasicBlock* InjectPrefetchPass::createPrefetchBB(BinaryFunction& BF,
     PrefetchBBs.back()->addInstruction(predLoad);  
   }
 
+  // create the last load and also change its prefetch distance
+  // mov 0x200(%r9,%rdx,8),%rax 
   int numOperands = DemandLoadInstr.getNumOperands();
   MCInst LoadPrefetchAddrInstr;
   LoadPrefetchAddrInstr.setOpcode(DemandLoadInstr.getOpcode());
@@ -597,6 +596,8 @@ BinaryBasicBlock* InjectPrefetchPass::createPrefetchBB(BinaryFunction& BF,
      }
   }
   PrefetchBBs.back()->addInstruction(LoadPrefetchAddrInstr);
+
+  // add prefetch instruction
   // prefetcht0 (%rax) 
   MCInst PrefetchInst;
   BC.MIB->createPrefetchT0(PrefetchInst, freeReg, 0, BC.MIB->getNoRegister(), 0, BC.MIB->getNoRegister(), LoadPrefetchAddrInstr);
