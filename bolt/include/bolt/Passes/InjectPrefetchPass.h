@@ -31,10 +31,11 @@ public:
   BinaryLoop* getOuterLoopForBB( BinaryFunction&, 
                                  BinaryBasicBlock*);
   BinaryBasicBlock* createBoundsCheckBB(BinaryFunction&, BinaryBasicBlock*,
-                                        MCInst*, MCInst, int prefetchDist);
+                                        MCInst*, MCInst, int prefetchDist,
+                                        MCPhysReg);
   BinaryBasicBlock* createPrefetchBB(BinaryFunction&, BinaryBasicBlock*,
                                      BinaryBasicBlock*, std::vector<MCInst*>, 
-                                     int prefetchDist);
+                                     int prefetchDist, MCPhysReg);
 
 
 private:

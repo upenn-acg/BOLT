@@ -2868,6 +2868,18 @@ public:
   }
 
 
+  MCPhysReg getUnusedReg(std::unordered_set<MCPhysReg> usedRegs) const override{
+    std::set<int>regs({X86::RAX, X86::RBX, X86::RCX, X86::RDX, X86::RSI, X86::RDI, X86::RBP, X86::R9, X86::R10, X86::R11, X86::R12, X86::R13, X86::R14, X86::R15});
+    for (auto it = regs.begin(); it!=regs.end(); it++){
+      if (usedRegs.find(*it)==usedRegs.end()){
+         return *it;
+      }
+    }
+    llvm::errs()<<"BOLT-ERROR: cannot assign a free register! all registers are in use\n";
+    return getNoRegister();
+  }
+
+
   bool createJZ(MCInst &Inst, const MCSymbol *Target, MCContext *Ctx) const override{
     Inst.setOpcode(X86::JCC_1);
     Inst.addOperand(MCOperand::createExpr(MCSymbolRefExpr::create(Target,MCSymbolRefExpr::VK_None, *Ctx)));

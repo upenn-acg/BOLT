@@ -35,6 +35,7 @@
 #include <system_error>
 #include <unordered_map>
 #include <unordered_set>
+#include <set>
 
 namespace llvm {
 class MCContext;
@@ -1548,6 +1549,11 @@ public:
                         const MCPhysReg lower32bitReg) const{
     llvm_unreachable("not implemented");
     return false;
+  }
+
+  virtual MCPhysReg getUnusedReg(std::unordered_set<MCPhysReg> usedRegs) const{
+    llvm_unreachable("not implemented");
+    return getNoRegister();;
   }
 
   /// Creates a call frame pseudo instruction. A single operand identifies which

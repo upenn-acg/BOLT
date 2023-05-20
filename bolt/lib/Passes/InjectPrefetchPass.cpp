@@ -76,12 +76,18 @@ bool InjectPrefetchPass::runOnFunction(BinaryFunction &BF) {
     }
   }
 
+  // get the loop (OuterLoop) that contains the Top LLC miss BB
+  // later on we need to utilize the Header Basic Block of this 
+  // loop
   BinaryLoop* OuterLoop = getOuterLoopForBB (BF, TopLLCMissBB);
   if (OuterLoop == NULL){
     llvm::outs()<<"[InjectPrefetchPass] The outer loop that contains top LLC miss BB doesn't exist\n";
     return false;
   }
 
+  // get all destination register of load instructions in the 
+  // for loop. and stored them into an set (TODO:I hope this is an 
+  // unordered_set) 
   std::set<MCRegister> DstRegsInOuterLoop;
   for (BinaryBasicBlock *BB : OuterLoop->getBlocks()){
     for (auto It = BB->begin(); It != BB->end(); It++){
@@ -95,6 +101,9 @@ bool InjectPrefetchPass::runOnFunction(BinaryFunction &BF) {
     }
   }  
 
+  // get all the predcessor Loads of the Top LLC miss instruction
+  // now we only assume one load instruction depends on another load 
+  // instruction.
   std::vector<MCInst*> predLoadInstrs;
   MCInst* predLoad = TopLLCMissInstr;
   BinaryBasicBlock* predLoadBB = TopLLCMissBB;
@@ -108,21 +117,12 @@ bool InjectPrefetchPass::runOnFunction(BinaryFunction &BF) {
  
   MCInst DemandLoadInstr = *(predLoadInstrs[1]);
 
+
+
   // get the loop header and check if the header is in
   // the loop we want
   // we are going to insert prefetch to the header basic block
   BinaryBasicBlock *HeaderBB = OuterLoop->getHeader();
-
-
-  // In the loop header, we need to inject prefetch instruction 
-  // first Push %rax 
-  auto Loc = HeaderBB->begin();
-
-  // inject pop %rax
-  MCInst PopInst; 
-  BC.MIB->createPopRegister(PopInst, BC.MIB->getX86RAX(), 8);
-  HeaderBB->insertRealInstruction(Loc, PopInst);
-
 
   // the next part is to inject the boundary check
   // first step is to detect loop induction variable
@@ -133,6 +133,10 @@ bool InjectPrefetchPass::runOnFunction(BinaryFunction &BF) {
 
   if (Latches.size()==0) return false;
   
+  // Here we assume that LoopInductionInstr is always 
+  // LoopGuradCMPInstr. This is a reasonable assumption 
+  // because after the loopGuardCMPInstr, the Latch will 
+  // be ended with a branch instr.
   MCInst* LoopInductionInstr = NULL;
   MCInst* LoopGuardCMPInstr = NULL;
   for (unsigned i=0; i<Latches.size(); i++){
@@ -141,12 +145,16 @@ bool InjectPrefetchPass::runOnFunction(BinaryFunction &BF) {
        if (BC.MIB->isADD(Inst)){
           int immValue = Inst.getOperand(2).getImm();
           if (immValue != 1) continue;
+          // the third operand of DemandLoadInstr is the index register
+          // namely the loop induction variable
           if (!(DemandLoadInstr.getOperand(3).getReg()==Inst.getOperand(0).getReg())) continue;
           LoopInductionInstr = &Inst;
        }
        else if (BC.MIB->isCMP(Inst)){
           for (unsigned i=0; i<Inst.getNumOperands(); i++){
             if (Inst.getOperand(i).isReg()){
+              // the third operand of DemandLoadInstr is the index register
+              // namely the loop induction variable
               if (DemandLoadInstr.getOperand(3).getReg()==Inst.getOperand(i).getReg()){
                 LoopGuardCMPInstr = & Inst;
               }
@@ -164,23 +172,65 @@ bool InjectPrefetchPass::runOnFunction(BinaryFunction &BF) {
     return false;
   }
 
+  std::unordered_set<MCPhysReg> usedRegs;
+  for (auto &instr: predLoadInstrs){
+    int numOperands = instr->getNumOperands();
+    // the first operand of a load instruction is the dst register
+    for (int i=1; i<numOperands; i++){
+      if (instr->getOperand(i).isReg()){
+        if (usedRegs.find(instr->getOperand(i).getReg())==usedRegs.end()){
+          usedRegs.insert(instr->getOperand(i).getReg());   
+        }
+      }
+    }
+  }
+
+  for (unsigned i=0; i<LoopGuardCMPInstr->getNumOperands(); i++){
+    if (LoopGuardCMPInstr->getOperand(i).isReg()){
+      if (usedRegs.find(LoopGuardCMPInstr->getOperand(i).getReg()) == usedRegs.end()){
+        usedRegs.insert(LoopGuardCMPInstr->getOperand(i).getReg());
+      }
+    }
+  }
+
+  MCPhysReg freeReg = BC.MIB->getUnusedReg(usedRegs);
+  if (freeReg == BC.MIB->getNoRegister()){
+    llvm::outs()<<"BOLT-ERROR: LoopGuardCMPInstr doesn't exist\n";
+    return false;
+  } 
+
+
+  // inject pop %rax to the Loop Header.
+  // pop instruction should be the first instruction of 
+  // the HeaderBB
+  auto Loc = HeaderBB->begin();
+  MCInst PopInst; 
+  BC.MIB->createPopRegister(PopInst, freeReg, 8);
+  HeaderBB->insertRealInstruction(Loc, PopInst);
+
+
+
+  // create BoundsCheckBB and PrefetchBB
   SmallVector<BinaryBasicBlock*, 0> PredsOfHeaderBB = HeaderBB->getPredecessors();
 
   BinaryBasicBlock* BoundsCheckBB = createBoundsCheckBB(BF, HeaderBB, 
                                                         LoopGuardCMPInstr, 
                                                         DemandLoadInstr, 
-                                                        prefetchDist);
+                                                        prefetchDist,
+                                                        freeReg);
 
   BinaryBasicBlock* PrefetchBB = createPrefetchBB(BF, HeaderBB, BoundsCheckBB, 
-                                                  predLoadInstrs, prefetchDist);
+                                                  predLoadInstrs, prefetchDist, 
+                                                  freeReg);
 
+  // change the control-flow-graph 
+  // first add set PrefetchBB to be the successor of
+  // the BoundsCheckBB
   BoundsCheckBB->addSuccessor(PrefetchBB);
 
   // add Predecessors to HeaderBB
   HeaderBB->addPredecessor(BoundsCheckBB); 
   HeaderBB->addPredecessor(PrefetchBB);
-
-
 
   // create Branch Instruction at the end of 
   // BoundsCheckBB
@@ -189,6 +239,7 @@ bool InjectPrefetchPass::runOnFunction(BinaryFunction &BF) {
   BoundsCheckBB->addInstruction(BoundsCheckBranch);
 
   // change HeaderBB's original predecessors' tail branch targets
+  // to be BoundsCheckBB
   for (unsigned i=0; i<PredsOfHeaderBB.size(); i++){
     MCInst* LastBranch = PredsOfHeaderBB[i]->getLastNonPseudoInstr();
     const MCExpr* LastBranchTargetExpr = LastBranch->getOperand(0).getExpr();
@@ -228,9 +279,6 @@ BinaryLoop* InjectPrefetchPass::getOuterLoopForBB( BinaryFunction& BF,
     BinaryLoop *L = OuterLoops.back();
     OuterLoops.pop_back();
 
-    ++BF.BLI->TotalLoops;
-    BF.BLI->MaximumDepth = std::max(L->getLoopDepth(), BF.BLI->MaximumDepth);
-
     bool containTopLLCMissBB = false;
     if (L->contains(TopLLCMissBB)){
       containTopLLCMissBB = true;
@@ -255,13 +303,17 @@ BinaryLoop* InjectPrefetchPass::getOuterLoopForBB( BinaryFunction& BF,
   // a nested loop, we are not going to inject prefetch
   if (LoopDepth < 2) {
     llvm::outs()<<"[InjectPrefetchPass] The outer loop that contains top LLC miss BB doesn't exist\n";
-    return OuterLoop;
+    return NULL;
   }
 
   OuterLoop = LoopsContainTopLLCMissBB[LoopDepth-2];
 
   return OuterLoop;
 }
+
+
+
+
 
 
 std::pair<MCInst*, BinaryBasicBlock*> InjectPrefetchPass::findDemandLoad(BinaryFunction& BF,
@@ -369,11 +421,15 @@ std::pair<MCInst*, BinaryBasicBlock*> InjectPrefetchPass::findDemandLoad(BinaryF
 
 
 
+
+
+
 BinaryBasicBlock* InjectPrefetchPass::createBoundsCheckBB(BinaryFunction& BF,
                                       BinaryBasicBlock* HeaderBB,
                                       MCInst* LoopGuardCMPInstr,
                                       MCInst DemandLoadInstr,
-                                      int prefetchDist){
+                                      int prefetchDist,
+                                      MCPhysReg freeReg){
   BinaryContext& BC = BF.getBinaryContext();
 
   // before we change the CFG of this function to add the 
@@ -408,18 +464,17 @@ BinaryBasicBlock* InjectPrefetchPass::createBoundsCheckBB(BinaryFunction& BF,
   // add instructions
   // create push %rax 
   MCInst PushInst; 
-  BC.MIB->createPushRegister(PushInst, BC.MIB->getX86RAX(), 8);
+  BC.MIB->createPushRegister(PushInst, freeReg, 8);
   BoundCheckBBs.back()->addInstruction(PushInst);
 
   // create mov %rdx, %rax
   MCInst MovInstr;
-  BC.MIB->createMOV64rr(MovInstr, BC.MIB->getX86RDX(), BC.MIB->getX86RAX());
+  BC.MIB->createMOV64rr(MovInstr, BC.MIB->getX86RDX(), freeReg);
   BoundCheckBBs.back()->addInstruction(MovInstr);
 
-  // create add %rax 0x20
-  //int prefetchDist = 64;
+  // create add %rax prefetchDist
   MCInst AddInstr;
-  BC.MIB->createADD64ri32(AddInstr, BC.MIB->getX86RAX(), BC.MIB->getX86RAX(), prefetchDist);
+  BC.MIB->createADD64ri32(AddInstr, freeReg, freeReg, prefetchDist);
   BoundCheckBBs.back()->addInstruction(AddInstr);
 
 
@@ -442,10 +497,11 @@ BinaryBasicBlock* InjectPrefetchPass::createBoundsCheckBB(BinaryFunction& BF,
   for (int i=0; i<NumOperandsCMP; i++){
     if (LoopGuardCMPInstr->getOperand(i).isReg()){
       if (DemandLoadInstr.getOperand(3).getReg()==LoopGuardCMPInstr->getOperand(i).getReg()){
-        CMPInstr.addOperand(MCOperand::createReg(BC.MIB->getX86RAX()));
+          CMPInstr.addOperand(MCOperand::createReg(freeReg));
       }
       else if (BC.MIB->isLower32bitReg(DemandLoadInstr.getOperand(3).getReg(), LoopGuardCMPInstr->getOperand(i).getReg())){
-        CMPInstr.addOperand(MCOperand::createReg(BC.MIB->getX86RAX()));
+          CMPInstr.addOperand(MCOperand::createReg(freeReg));
+
       }
       else {
         CMPInstr.addOperand(LoopGuardCMPInstr->getOperand(i));
@@ -477,11 +533,15 @@ BinaryBasicBlock* InjectPrefetchPass::createBoundsCheckBB(BinaryFunction& BF,
 }
 
 
+
+
+
 BinaryBasicBlock* InjectPrefetchPass::createPrefetchBB(BinaryFunction& BF,
                                       BinaryBasicBlock* HeaderBB,
                                       BinaryBasicBlock* BoundsCheckBB,
                                       std::vector<MCInst*> predLoadInstrs,
-                                      int prefetchDist){
+                                      int prefetchDist,
+                                      MCPhysReg freeReg){
 
   BinaryContext& BC = BF.getBinaryContext();
   MCInst DemandLoadInstr = *(predLoadInstrs[1]); 
@@ -526,7 +586,7 @@ BinaryBasicBlock* InjectPrefetchPass::createPrefetchBB(BinaryFunction& BF,
   for (int i=0; i<numOperands; i++){
      if (i==0){
        // the first operand is the dest reg
-       LoadPrefetchAddrInstr.addOperand(MCOperand::createReg(BC.MIB->getX86RAX())); 
+       LoadPrefetchAddrInstr.addOperand(MCOperand::createReg(freeReg)); 
      }
      else if (i==4){
        // the 5th operand is the offset
@@ -539,7 +599,8 @@ BinaryBasicBlock* InjectPrefetchPass::createPrefetchBB(BinaryFunction& BF,
   PrefetchBBs.back()->addInstruction(LoadPrefetchAddrInstr);
   // prefetcht0 (%rax) 
   MCInst PrefetchInst;
-  BC.MIB->createPrefetchT0(PrefetchInst, BC.MIB->getX86RAX(), 0, BC.MIB->getNoRegister(), 0, BC.MIB->getNoRegister(), LoadPrefetchAddrInstr);
+  BC.MIB->createPrefetchT0(PrefetchInst, freeReg, 0, BC.MIB->getNoRegister(), 0, BC.MIB->getNoRegister(), LoadPrefetchAddrInstr);
+
   PrefetchBBs.back()->addInstruction(PrefetchInst);
  
   // create unconditional branch at the end of 
@@ -555,6 +616,9 @@ BinaryBasicBlock* InjectPrefetchPass::createPrefetchBB(BinaryFunction& BF,
 
 
 
+
+
+
 std::vector<std::string> InjectPrefetchPass::splitLine(std::string str){
    std::vector<std::string> words;
    std::stringstream ss(str);
@@ -565,6 +629,9 @@ std::vector<std::string> InjectPrefetchPass::splitLine(std::string str){
    }
    return words;
 }
+
+
+
 
 
 std::unordered_map<std::string, uint64_t> InjectPrefetchPass::getTopLLCMissLocationFromFile(){
@@ -592,9 +659,15 @@ std::unordered_map<std::string, uint64_t> InjectPrefetchPass::getTopLLCMissLocat
 }
 
 
+
+
+
 std::string InjectPrefetchPass::removeSuffix(std::string FuncName){
    return FuncName.substr(0, FuncName.find("("));
 }
+
+
+
 
 
 void InjectPrefetchPass::runOnFunctions(BinaryContext &BC) {
