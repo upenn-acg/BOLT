@@ -114,6 +114,10 @@ bool InjectPrefetchLitePass::runOnFunction(BinaryFunction &BF) {
     return false;
   }
 
+  if (BC.MIB->hasAnnotation(*LoopGuardCMPInstr, "AbsoluteAddr")){
+    uint64_t AbsoluteAddr = (uint64_t)BC.MIB->getAnnotationAs<uint64_t>(*LoopGuardCMPInstr, "AbsoluteAddr");        
+    llvm::outs()<<"##### addr = 0x"<<utohexstr(AbsoluteAddr);
+  }
 
   std::unordered_set<MCPhysReg> usedRegs;
   int numOperands = TopLLCMissInstr->getNumOperands();
@@ -141,15 +145,6 @@ bool InjectPrefetchLitePass::runOnFunction(BinaryFunction &BF) {
   } 
 
 
-  // inject pop %rax to the Loop Header.
-  // pop instruction should be the first instruction of 
-  // the HeaderBB
-  auto Loc = TopLLCMissBB->begin();
-  MCInst PopInst; 
-  BC.MIB->createPopRegister(PopInst, freeReg, 8);
-  TopLLCMissBB->insertRealInstruction(Loc, PopInst);
-
-
 
   // create BoundsCheckBB and PrefetchBB
   SmallVector<BinaryBasicBlock*, 0> PredsOfHeaderBB = TopLLCMissBB->getPredecessors();
@@ -159,6 +154,7 @@ bool InjectPrefetchLitePass::runOnFunction(BinaryFunction &BF) {
 
   BinaryBasicBlock* BoundsCheckBB = createBoundsCheckBB(BF, TopLLCMissBB, 
                                                         LoopGuardCMPInstr, 
+                                                        LoopInductionInstr,
                                                         TopLLCMissInstr, 
                                                         prefetchDist,
                                                         freeReg);
@@ -193,6 +189,16 @@ bool InjectPrefetchLitePass::runOnFunction(BinaryFunction &BF) {
     }
   }
 */
+
+
+  // inject pop %rax to the Loop Header.
+  // pop instruction should be the first instruction of 
+  // the HeaderBB
+  auto Loc = TopLLCMissBB->begin();
+  MCInst PopInst; 
+  BC.MIB->createPopRegister(PopInst, freeReg, 8);
+  TopLLCMissBB->insertRealInstruction(Loc, PopInst);
+
   return true;
 }
 
@@ -370,6 +376,7 @@ std::pair<MCInst*, BinaryBasicBlock*> InjectPrefetchLitePass::findDemandLoad(Bin
 BinaryBasicBlock* InjectPrefetchLitePass::createBoundsCheckBB(BinaryFunction& BF,
                                       BinaryBasicBlock* TopLLCMissBB,
                                       MCInst* LoopGuardCMPInstr,
+                                      MCInst* LoopInductionInstr,
                                       MCInst* TopLLCMissInstr,
                                       int prefetchDist,
                                       MCPhysReg freeReg){
@@ -412,7 +419,7 @@ BinaryBasicBlock* InjectPrefetchLitePass::createBoundsCheckBB(BinaryFunction& BF
 
   // create mov %rdx, %rax
   MCInst MovInstr;
-  BC.MIB->createMOV64rr(MovInstr, BC.MIB->getX86RDX(), freeReg);
+  BC.MIB->createMOV64rr(MovInstr, LoopInductionInstr->getOperand(1).getReg(), freeReg);
   BoundCheckBBs.back()->addInstruction(MovInstr);
 
   // create add %rax prefetchDist
@@ -466,7 +473,8 @@ BinaryBasicBlock* InjectPrefetchLitePass::createBoundsCheckBB(BinaryFunction& BF
 */
     CMPInstr.addOperand(LoopGuardCMPInstr->getOperand(i));
   }
-  BoundCheckBBs.back()->addInstruction(CMPInstr);
+//  BoundCheckBBs.back()->addInstruction(CMPInstr);
+  BoundCheckBBs.back()->addInstruction(*LoopGuardCMPInstr);
 
   // insert this Basic Block to binary function
   for (unsigned i=0; i<PredsOfTopLLCMissBB.size(); i++){

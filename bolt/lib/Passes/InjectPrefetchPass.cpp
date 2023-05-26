@@ -216,7 +216,8 @@ bool InjectPrefetchPass::runOnFunction(BinaryFunction &BF) {
   SmallVector<BinaryBasicBlock*, 0> PredsOfHeaderBB = HeaderBB->getPredecessors();
 
   BinaryBasicBlock* BoundsCheckBB = createBoundsCheckBB(BF, HeaderBB, 
-                                                        LoopGuardCMPInstr, 
+                                                        LoopGuardCMPInstr,
+                                                        LoopInductionInstr, 
                                                         DemandLoadInstr, 
                                                         prefetchDist,
                                                         freeReg);
@@ -428,6 +429,7 @@ std::pair<MCInst*, BinaryBasicBlock*> InjectPrefetchPass::findDemandLoad(BinaryF
 BinaryBasicBlock* InjectPrefetchPass::createBoundsCheckBB(BinaryFunction& BF,
                                       BinaryBasicBlock* HeaderBB,
                                       MCInst* LoopGuardCMPInstr,
+                                      MCInst* LoopInductionInstr,
                                       MCInst DemandLoadInstr,
                                       int prefetchDist,
                                       MCPhysReg freeReg){
@@ -460,7 +462,7 @@ BinaryBasicBlock* InjectPrefetchPass::createBoundsCheckBB(BinaryFunction& BF,
     BoundCheckBBs.back()->addPredecessor(PredOfHeaderBB);
   }
   // add successor
-  BoundCheckBBs.back()->addSuccessor(HeaderBB, 0,0);
+  BoundCheckBBs.back()->addSuccessor(HeaderBB, 0, 0);
 
   // add instructions
   // create push %rax 
@@ -470,7 +472,7 @@ BinaryBasicBlock* InjectPrefetchPass::createBoundsCheckBB(BinaryFunction& BF,
 
   // create mov %rdx, %rax
   MCInst MovInstr;
-  BC.MIB->createMOV64rr(MovInstr, BC.MIB->getX86RDX(), freeReg);
+  BC.MIB->createMOV64rr(MovInstr, LoopInductionInstr->getOperand(1).getReg(), freeReg);
   BoundCheckBBs.back()->addInstruction(MovInstr);
 
   // create add %rax prefetchDist
@@ -525,6 +527,7 @@ BinaryBasicBlock* InjectPrefetchPass::createBoundsCheckBB(BinaryFunction& BF,
   BoundCheckBBs.back()->addInstruction(CMPInstr);
 
   // insert this Basic Block to binary function
+  // TODO: change the way to decide the BB for injecting
   BF.insertBasicBlocks(PredsOfHeaderBB[1], std::move(BoundCheckBBs));
 
   BinaryBasicBlock* BoundsCheckBB = BF.getBasicBlockForLabel(BoundsCheckLabel);    
