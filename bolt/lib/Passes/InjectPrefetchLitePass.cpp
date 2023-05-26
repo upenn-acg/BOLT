@@ -116,7 +116,7 @@ bool InjectPrefetchLitePass::runOnFunction(BinaryFunction &BF) {
 
   if (BC.MIB->hasAnnotation(*LoopGuardCMPInstr, "AbsoluteAddr")){
     uint64_t AbsoluteAddr = (uint64_t)BC.MIB->getAnnotationAs<uint64_t>(*LoopGuardCMPInstr, "AbsoluteAddr");        
-    llvm::outs()<<"##### addr = 0x"<<utohexstr(AbsoluteAddr);
+    llvm::outs()<<"##### addr = 0x"<<utohexstr(AbsoluteAddr)<<"\n";
   }
 
   std::unordered_set<MCPhysReg> usedRegs;
@@ -203,15 +203,7 @@ bool InjectPrefetchLitePass::runOnFunction(BinaryFunction &BF) {
   MCInst PopInst; 
   BC.MIB->createPopRegister(PopInst, freeReg, 8);
   TopLLCMissBB->insertRealInstruction(Loc, PopInst);
-/*
-  auto Loc = TopLLCMissBB->begin();
-  Loc++;
-  Loc++;
-  MCInst PrefetchInst;
-  MCInst tmp;
-  BC.MIB->createPrefetchT0(PrefetchInst, TopLLCMissInstr->getOperand(1).getReg(), 0x10405230+0x800, BC.MIB->getNoRegister(), 0, BC.MIB->getNoRegister(), tmp);
-  TopLLCMissBB->insertRealInstruction(Loc, PrefetchInst);
-*/
+
   return true;
 }
 
@@ -488,7 +480,6 @@ BinaryBasicBlock* InjectPrefetchLitePass::createBoundsCheckBB(BinaryFunction& BF
     }
   }
   BoundCheckBBs.back()->addInstruction(CMPInstr);
-//  BoundCheckBBs.back()->addInstruction(*LoopGuardCMPInstr);
 
   // insert this Basic Block to binary function
   for (unsigned i=0; i<PredsOfTopLLCMissBB.size(); i++){
@@ -536,10 +527,9 @@ BinaryBasicBlock* InjectPrefetchLitePass::createPrefetchBB(BinaryFunction& BF,
   // prefetcht0 (%rax) 
   MCInst PrefetchInst;
   MCInst tmp;
-  //BC.MIB->createPrefetchT0(PrefetchInst, freeReg, 0, BC.MIB->getNoRegister(), 0, BC.MIB->getNoRegister(), tmp);
-  BC.MIB->createPrefetchT0(PrefetchInst, TopLLCMissInstr->getOperand(1).getReg(), 0x10405230+prefetchDist, BC.MIB->getNoRegister(), 0, BC.MIB->getNoRegister(), tmp);
+  BC.MIB->createPrefetchT0Expr(PrefetchInst, freeReg, TopLLCMissInstr->getOperand(4).getExpr(), BC.MIB->getNoRegister(), 0, BC.MIB->getNoRegister(), tmp);
   PrefetchBBs.back()->addInstruction(PrefetchInst);
- 
+
   // create unconditional branch at the end of 
   // prefetchBB
   PrefetchBBs.back()->addBranchInstruction(TopLLCMissBB);  
