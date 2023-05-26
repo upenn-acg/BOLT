@@ -77,6 +77,21 @@ bool InjectPrefetchLitePass::runOnFunction(BinaryFunction &BF) {
   }
 
 
+  // create BoundsCheckBB and PrefetchBB
+  SmallVector<BinaryBasicBlock*, 0> PredsOfTopLLCMissBB = TopLLCMissBB->getPredecessors();
+  
+  bool TopLLCMissBBhasLoop = false;
+  for (unsigned i=0; i<PredsOfTopLLCMissBB.size(); i++){
+    if(PredsOfTopLLCMissBB[i] == TopLLCMissBB){
+      TopLLCMissBBhasLoop = true;
+      break;
+    }
+  }
+  if (!TopLLCMissBBhasLoop){
+    llvm::outs()<<"[InjectPrefetchLitePass] this binary cannot be optimized by InjectPrefetchLitePass\n";
+    return false;
+  }
+
   // Here we assume that LoopInductionInstr is always 
   // LoopGuradCMPInstr. This is a reasonable assumption 
   // because after the loopGuardCMPInstr, the Latch will 
@@ -114,11 +129,6 @@ bool InjectPrefetchLitePass::runOnFunction(BinaryFunction &BF) {
     return false;
   }
 
-  if (BC.MIB->hasAnnotation(*LoopGuardCMPInstr, "AbsoluteAddr")){
-    uint64_t AbsoluteAddr = (uint64_t)BC.MIB->getAnnotationAs<uint64_t>(*LoopGuardCMPInstr, "AbsoluteAddr");        
-    llvm::outs()<<"##### addr = 0x"<<utohexstr(AbsoluteAddr)<<"\n";
-  }
-
   std::unordered_set<MCPhysReg> usedRegs;
   int numOperands = TopLLCMissInstr->getNumOperands();
     // the first operand of a load instruction is the dst register
@@ -144,12 +154,6 @@ bool InjectPrefetchLitePass::runOnFunction(BinaryFunction &BF) {
     return false;
   } 
 
-
-
-  // create BoundsCheckBB and PrefetchBB
-  SmallVector<BinaryBasicBlock*, 0> PredsOfTopLLCMissBB = TopLLCMissBB->getPredecessors();
-  
-  llvm::outs()<<"@@@ the number of preds of TopLLCMissBB is: "<<PredsOfTopLLCMissBB.size()<<"\n";
 
 
   BinaryBasicBlock* BoundsCheckBB = createBoundsCheckBB(BF, TopLLCMissBB, 
@@ -193,8 +197,6 @@ bool InjectPrefetchLitePass::runOnFunction(BinaryFunction &BF) {
       PredsOfTopLLCMissBB[i]->addBranchInstruction(BoundsCheckBB);  
     }
   }
-
-
 
   // inject pop %rax to the Loop Header.
   // pop instruction should be the first instruction of 
@@ -485,7 +487,6 @@ BinaryBasicBlock* InjectPrefetchLitePass::createBoundsCheckBB(BinaryFunction& BF
   for (unsigned i=0; i<PredsOfTopLLCMissBB.size(); i++){
     if (PredsOfTopLLCMissBB[i]==TopLLCMissBB) continue;
     else{
-      llvm::outs()<<"@@@ BoundsCheckBB is inserted\n";
       BF.insertBasicBlocks(PredsOfTopLLCMissBB[i], std::move(BoundCheckBBs));
       break;
     }

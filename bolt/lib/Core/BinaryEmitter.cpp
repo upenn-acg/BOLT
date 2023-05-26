@@ -475,22 +475,6 @@ void BinaryEmitter::emitFunctionBody(BinaryFunction &BF, bool EmitColdPart,
         BB->getLocSyms().emplace_back(Offset, LocSym);
       }
 
-      if (BC.MIB->isPrefetchT0(Instr)){
-         llvm::outs()<<"######  A prefetch!\n";
-         llvm::outs()<<"num of operands: "<<Instr.getNumOperands()<<"\n";
-         for (unsigned i=0; i<Instr.getNumOperands(); i++){
-            if (Instr.getOperand(i).isImm()){
-               llvm::outs()<<"### a imm\n";
-            }
-            else if (Instr.getOperand(i).isReg()){
-               llvm::outs()<<"### a reg\n";
-            }
-            else if (Instr.getOperand(i).isInst()){
-               llvm::outs()<<"### a inst\n";
-            }
-         }
-      }
-
       Streamer.emitInstruction(Instr, *BC.STI);
       LastIsPrefix = BC.MIB->isPrefix(Instr);
     }
