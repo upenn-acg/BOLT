@@ -190,7 +190,7 @@ bool InjectPrefetchLitePass::runOnFunction(BinaryFunction &BF) {
       }
     }
     else{
-      //TODO
+      PredsOfTopLLCMissBB[i]->addBranchInstruction(BoundsCheckBB);  
     }
   }
 
@@ -203,7 +203,15 @@ bool InjectPrefetchLitePass::runOnFunction(BinaryFunction &BF) {
   MCInst PopInst; 
   BC.MIB->createPopRegister(PopInst, freeReg, 8);
   TopLLCMissBB->insertRealInstruction(Loc, PopInst);
-
+/*
+  auto Loc = TopLLCMissBB->begin();
+  Loc++;
+  Loc++;
+  MCInst PrefetchInst;
+  MCInst tmp;
+  BC.MIB->createPrefetchT0(PrefetchInst, TopLLCMissInstr->getOperand(1).getReg(), 0x10405230+0x800, BC.MIB->getNoRegister(), 0, BC.MIB->getNoRegister(), tmp);
+  TopLLCMissBB->insertRealInstruction(Loc, PrefetchInst);
+*/
   return true;
 }
 
@@ -450,20 +458,20 @@ BinaryBasicBlock* InjectPrefetchLitePass::createBoundsCheckBB(BinaryFunction& BF
     }
   }
 
-  for (int i=0; i<NumOperandsCMP; i++){
-/*    if (LoopGuardCMPInstr->getOperand(i).isReg()){
-      if (DemandLoadInstr.getOperand(3).getReg()==LoopGuardCMPInstr->getOperand(i).getReg()){
-          CMPInstr.addOperand(MCOperand::createReg(freeReg));
+  for (int i=0; i<NumOperandsCMP; i++) {
+    if (LoopGuardCMPInstr->getOperand(i).isReg()){
+      if (LoopInductionInstr->getOperand(1).getReg()==LoopGuardCMPInstr->getOperand(i).getReg()){
+        CMPInstr.addOperand(MCOperand::createReg(freeReg));
       }
-      else if (BC.MIB->isLower32bitReg(DemandLoadInstr.getOperand(3).getReg(), LoopGuardCMPInstr->getOperand(i).getReg())){
-          CMPInstr.addOperand(MCOperand::createReg(freeReg));
-
+      else if (BC.MIB->isLower32bitReg(LoopInductionInstr->getOperand(1).getReg(), LoopGuardCMPInstr->getOperand(i).getReg())){
+        CMPInstr.addOperand(MCOperand::createReg(freeReg));
       }
       else {
         CMPInstr.addOperand(LoopGuardCMPInstr->getOperand(i));
       }
     }
-    else {
+    else{
+/*    else {
       // LoopGuardCMPInstr is a CMP instruction
       // In CMP instruction, there is only 1 immediate operand
       // which is the displacement
@@ -476,10 +484,11 @@ BinaryBasicBlock* InjectPrefetchLitePass::createBoundsCheckBB(BinaryFunction& BF
       }
     }
 */
-    CMPInstr.addOperand(LoopGuardCMPInstr->getOperand(i));
+      CMPInstr.addOperand(LoopGuardCMPInstr->getOperand(i));
+    }
   }
-//  BoundCheckBBs.back()->addInstruction(CMPInstr);
-  BoundCheckBBs.back()->addInstruction(*LoopGuardCMPInstr);
+  BoundCheckBBs.back()->addInstruction(CMPInstr);
+//  BoundCheckBBs.back()->addInstruction(*LoopGuardCMPInstr);
 
   // insert this Basic Block to binary function
   for (unsigned i=0; i<PredsOfTopLLCMissBB.size(); i++){
@@ -508,7 +517,7 @@ BinaryBasicBlock* InjectPrefetchLitePass::createBoundsCheckBB(BinaryFunction& BF
 BinaryBasicBlock* InjectPrefetchLitePass::createPrefetchBB(BinaryFunction& BF,
                                       BinaryBasicBlock* TopLLCMissBB,
                                       BinaryBasicBlock* BoundsCheckBB,
-                                      MCInst* TopLLCMissInstrs,
+                                      MCInst* TopLLCMissInstr,
                                       int prefetchDist,
                                       MCPhysReg freeReg){
 
@@ -527,8 +536,8 @@ BinaryBasicBlock* InjectPrefetchLitePass::createPrefetchBB(BinaryFunction& BF,
   // prefetcht0 (%rax) 
   MCInst PrefetchInst;
   MCInst tmp;
-  BC.MIB->createPrefetchT0(PrefetchInst, freeReg, 0, BC.MIB->getNoRegister(), 0, BC.MIB->getNoRegister(), tmp);
-
+  //BC.MIB->createPrefetchT0(PrefetchInst, freeReg, 0, BC.MIB->getNoRegister(), 0, BC.MIB->getNoRegister(), tmp);
+  BC.MIB->createPrefetchT0(PrefetchInst, TopLLCMissInstr->getOperand(1).getReg(), 0x10405230+prefetchDist, BC.MIB->getNoRegister(), 0, BC.MIB->getNoRegister(), tmp);
   PrefetchBBs.back()->addInstruction(PrefetchInst);
  
   // create unconditional branch at the end of 

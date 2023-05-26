@@ -32,8 +32,8 @@ public:
   BinaryLoop* getOuterLoopForBB( BinaryFunction&, 
                                  BinaryBasicBlock*);
   BinaryBasicBlock* createBoundsCheckBB(BinaryFunction&, BinaryBasicBlock*,
-                                        MCInst*, MCInst*, int prefetchDist,
-                                        MCPhysReg);
+                                        MCInst*, MCInst*, MCInst*,
+                                        int prefetchDist, MCPhysReg);
   BinaryBasicBlock* createPrefetchBB(BinaryFunction&, BinaryBasicBlock*,
                                      BinaryBasicBlock*, MCInst*, 
                                      int prefetchDist, MCPhysReg);
