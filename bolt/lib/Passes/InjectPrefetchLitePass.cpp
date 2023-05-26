@@ -147,9 +147,9 @@ bool InjectPrefetchLitePass::runOnFunction(BinaryFunction &BF) {
 
 
   // create BoundsCheckBB and PrefetchBB
-  SmallVector<BinaryBasicBlock*, 0> PredsOfHeaderBB = TopLLCMissBB->getPredecessors();
+  SmallVector<BinaryBasicBlock*, 0> PredsOfTopLLCMissBB = TopLLCMissBB->getPredecessors();
   
-  llvm::outs()<<"@@@ the number of preds of TopLLCMissBB is: "<<PredsOfHeaderBB.size()<<"\n";
+  llvm::outs()<<"@@@ the number of preds of TopLLCMissBB is: "<<PredsOfTopLLCMissBB.size()<<"\n";
 
 
   BinaryBasicBlock* BoundsCheckBB = createBoundsCheckBB(BF, TopLLCMissBB, 
@@ -177,18 +177,23 @@ bool InjectPrefetchLitePass::runOnFunction(BinaryFunction &BF) {
   MCInst BoundsCheckBranch;
   BC.MIB->createJZ(BoundsCheckBranch, TopLLCMissBB->getLabel()  , BC.Ctx.get());
   BoundsCheckBB->addInstruction(BoundsCheckBranch);
-/*
+
   // change HeaderBB's original predecessors' tail branch targets
   // to be BoundsCheckBB
-  for (unsigned i=0; i<PredsOfHeaderBB.size(); i++){
-    MCInst* LastBranch = PredsOfHeaderBB[i]->getLastNonPseudoInstr();
-    const MCExpr* LastBranchTargetExpr = LastBranch->getOperand(0).getExpr();
-    const MCSymbol* LastBranchTargetSymbol = BC.MIB->getTargetSymbol(LastBranchTargetExpr);
-    if (LastBranchTargetSymbol==HeaderBB->getLabel()){
-      BC.MIB->replaceBranchTarget(*LastBranch, BoundsCheckBB->getLabel(), BC.Ctx.get());
+  for (unsigned i=0; i<PredsOfTopLLCMissBB.size(); i++){
+    MCInst* LastBranch = PredsOfTopLLCMissBB[i]->getLastNonPseudoInstr();
+    if ((LastBranch != NULL) && (BC.MIB->isBranch(*LastBranch))){
+      const MCExpr* LastBranchTargetExpr = LastBranch->getOperand(0).getExpr();
+      const MCSymbol* LastBranchTargetSymbol = BC.MIB->getTargetSymbol(LastBranchTargetExpr);
+      if (LastBranchTargetSymbol==TopLLCMissBB->getLabel()){
+         BC.MIB->replaceBranchTarget(*LastBranch, BoundsCheckBB->getLabel(), BC.Ctx.get());
+      }
+    }
+    else{
+      //TODO
     }
   }
-*/
+
 
 
   // inject pop %rax to the Loop Header.
