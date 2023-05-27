@@ -1527,6 +1527,25 @@ public:
     return false; 
   }
 
+  virtual bool createPrefetchT0Expr(MCInst &Inst, const MCPhysReg &DstReg,
+                                   const MCExpr *OffsetExpr, const MCPhysReg &BaseReg, 
+                                   int Scale, const MCPhysReg &AddrSegmentReg, 
+                                   const MCInst &Inst0) const {
+    llvm_unreachable("not implemented");
+    return false; 
+  }
+
+
+   virtual bool createLEA64r(MCInst &Inst, const MCPhysReg &BaseReg,
+                             int64_t Scale, const MCPhysReg &IndexReg, int64_t Offset,
+                             const MCPhysReg &AddrSegmentReg,
+                             const MCPhysReg &DstReg) const {
+     llvm_unreachable("not implemented");
+     return false;  
+   }
+
+
+        
   virtual bool createADD64ri32(MCInst &Inst, const MCPhysReg &DstReg,
                                 const MCPhysReg &SrcReg, int64_t Value) const {
     llvm_unreachable("not implemented");

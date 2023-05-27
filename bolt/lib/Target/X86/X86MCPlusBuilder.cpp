@@ -2780,6 +2780,21 @@ public:
     return true;
   } 
 
+  bool createPrefetchT0Expr(MCInst &Inst, const MCPhysReg &DstReg,
+                            const MCExpr *OffsetExpr, const MCPhysReg &BaseReg,
+                            int Scale, const MCPhysReg &AddrSegmentReg,
+                            const MCInst &Inst0) const override {
+
+    Inst.setOpcode(X86::PREFETCHT0);
+    Inst.addOperand(MCOperand::createReg(DstReg));
+    Inst.addOperand(MCOperand::createImm(Scale));
+    Inst.addOperand(MCOperand::createReg(BaseReg));
+    Inst.addOperand(MCOperand::createExpr(OffsetExpr));
+    Inst.addOperand(MCOperand::createReg(AddrSegmentReg));
+    Inst.addOperand(MCOperand::createImm(0));
+    return true;
+  } 
+
 
   bool createADD64ri32(MCInst &Inst, const MCPhysReg &DstReg, 
                      const MCPhysReg &SrcReg, int64_t Value) const override{
@@ -2796,6 +2811,20 @@ public:
     Inst.setOpcode(X86::MOV64rr);
     Inst.addOperand(MCOperand::createReg(SrcReg));
     Inst.addOperand(MCOperand::createReg(DstReg));
+    return true;
+  }
+
+  bool createLEA64r(MCInst &Inst, const MCPhysReg &BaseReg, 
+                   int64_t Scale, const MCPhysReg &IndexReg, int64_t Offset,
+                   const MCPhysReg &AddrSegmentReg,
+                   const MCPhysReg &DstReg) const override{
+    Inst.setOpcode(X86::LEA64r);
+    Inst.addOperand(MCOperand::createReg(DstReg));
+    Inst.addOperand(MCOperand::createReg(BaseReg));
+    Inst.addOperand(MCOperand::createImm(Scale));
+    Inst.addOperand(MCOperand::createReg(IndexReg));
+    Inst.addOperand(MCOperand::createImm(Offset)); // Displacement
+    Inst.addOperand(MCOperand::createReg(AddrSegmentReg)); // AddrSegmentReg
     return true;
   }
 

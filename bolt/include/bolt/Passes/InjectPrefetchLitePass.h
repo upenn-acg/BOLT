@@ -21,7 +21,7 @@ public:
   const char *getName() const override { return "inject-prefetch-lite"; }
 
   /// Helper functions
-  std::unordered_map<std::string, uint64_t> getTopLLCMissLocationFromFile();
+  std::unordered_map<std::string, std::vector<uint64_t>> getTopLLCMissLocationFromFile();
   std::vector<std::string> splitLine(std::string);
   std::string removeSuffix(std::string);
   /// real functions
@@ -35,11 +35,11 @@ public:
                                         MCInst*, MCInst*, MCInst*,
                                         int prefetchDist, MCPhysReg);
   BinaryBasicBlock* createPrefetchBB(BinaryFunction&, BinaryBasicBlock*,
-                                     BinaryBasicBlock*, MCInst*, 
+                                     BinaryBasicBlock*, MCInst*, MCInst*, 
                                      int prefetchDist, MCPhysReg);
 
 private:
-  std::unordered_map<std::string, uint64_t> TopLLCMissLocations;
+  std::unordered_map<std::string, std::vector<uint64_t>> TopLLCMissLocations;
 };
 
 } // namespace bolt
