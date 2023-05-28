@@ -47,19 +47,27 @@ bool InjectPrefetchLitePass::runOnFunction(BinaryFunction &BF) {
   llvm::outs()<<"[InjectPrefetchLitePass] The top llc miss addr is: 0x"
               <<utohexstr(TopLLCMissAddr)<<"\n";
 
+  std::unordered_set<uint64_t> TopLLCMissAddrs_set;
+  for (unsigned i=0; i<TopLLCMissAddrs.size(); i++){
+    TopLLCMissAddrs_set.insert(TopLLCMissAddrs[i]);
+  }
+
+  llvm::outs()<<"@@@@@@@@@@@@@@@@@@@@\n";
 
   // get the Instruction and Basic Block that contains 
   // the TOP LLC miss instruction. 
   BinaryBasicBlock* TopLLCMissBB = NULL;
   MCInst* TopLLCMissInstr = NULL;
   std::vector<MCInst*> TopLLCMissInstrs;
+
+
   for (auto BBI = BF.begin(); BBI != BF.end(); BBI ++){
     BinaryBasicBlock &BB = *BBI;
     for (auto It = BB.begin(); It != BB.end(); It++){
       MCInst &Instr = *It;
       if (BC.MIB->hasAnnotation(Instr, "AbsoluteAddr")){
         uint64_t AbsoluteAddr = (uint64_t)BC.MIB->getAnnotationAs<uint64_t>(Instr, "AbsoluteAddr");        
-        if (AbsoluteAddr == TopLLCMissAddr){
+        if (TopLLCMissAddrs_set.find(AbsoluteAddr) != TopLLCMissAddrs_set.end()){
           llvm::outs()<<"[InjectPrefetchLitePass] find instruction that causes the TOP LLC miss\n";
           if (BC.MIB->isLoad(Instr)){
             llvm::outs()<<"[InjectPrefetchLitePass] TOP LLC miss instruction is a load\n";           
@@ -176,7 +184,7 @@ bool InjectPrefetchLitePass::runOnFunction(BinaryFunction &BF) {
                                                         freeReg);
 
   BinaryBasicBlock* PrefetchBB = createPrefetchBB(BF, TopLLCMissBB, BoundsCheckBB, 
-                                                  TopLLCMissInstr, LoopInductionInstr, prefetchDist, 
+                                                  TopLLCMissInstrs, LoopInductionInstr, prefetchDist, 
                                                   freeReg);
 
   // change the control-flow-graph 
@@ -407,7 +415,7 @@ BinaryBasicBlock* InjectPrefetchLitePass::createBoundsCheckBB(BinaryFunction& BF
                                       BinaryBasicBlock* TopLLCMissBB,
                                       MCInst* LoopGuardCMPInstr,
                                       MCInst* LoopInductionInstr,
-                                      MCInst* TopLLCMissInstr,
+                                      MCInst* TopLLCMissInstrs,
                                       int prefetchDist,
                                       MCPhysReg freeReg){
   BinaryContext& BC = BF.getBinaryContext();
@@ -532,7 +540,7 @@ BinaryBasicBlock* InjectPrefetchLitePass::createBoundsCheckBB(BinaryFunction& BF
 BinaryBasicBlock* InjectPrefetchLitePass::createPrefetchBB(BinaryFunction& BF,
                                       BinaryBasicBlock* TopLLCMissBB,
                                       BinaryBasicBlock* BoundsCheckBB,
-                                      MCInst* TopLLCMissInstr,
+                                      std::vector<MCInst*> TopLLCMissInstrs,
                                       MCInst* LoopInductionInstr,
                                       int prefetchDist,
                                       MCPhysReg freeReg){
@@ -548,6 +556,7 @@ BinaryBasicBlock* InjectPrefetchLitePass::createPrefetchBB(BinaryFunction& BF,
   PrefetchBBs.back()->addSuccessor(TopLLCMissBB, 0,0);
   PrefetchBBs.back()->addPredecessor(BoundsCheckBB);
 
+  MCInst* TopLLCMissInstr = TopLLCMissInstrs[0];
 
   MCInst Lea64rInstr;
   if (TopLLCMissInstr->getOperand(1).getReg()==LoopInductionInstr->getOperand(1).getReg()){
@@ -560,21 +569,22 @@ BinaryBasicBlock* InjectPrefetchLitePass::createPrefetchBB(BinaryFunction& BF,
 
   // add prefetch instruction
   // prefetcht0 (%rax) 
-  MCInst PrefetchInst;
-  MCInst tmp;
-  if (TopLLCMissInstr->getOperand(1).getReg()==LoopInductionInstr->getOperand(1).getReg()){
-    BC.MIB->createPrefetchT0Expr(PrefetchInst, freeReg, TopLLCMissInstr->getOperand(4).getExpr(), BC.MIB->getNoRegister(), TopLLCMissInstr->getOperand(2).getImm(), BC.MIB->getNoRegister(), tmp);
-  }
-  else if (TopLLCMissInstr->getOperand(3).getReg()==LoopInductionInstr->getOperand(1).getReg()){
-    BC.MIB->createPrefetchT0Expr(PrefetchInst, TopLLCMissInstr->getOperand(1).getReg(), TopLLCMissInstr->getOperand(4).getExpr(), freeReg, TopLLCMissInstr->getOperand(2).getImm(), BC.MIB->getNoRegister(), tmp);
-  }
-  else{
-    llvm::outs()<<"[InjectPrefetchLitePass] TopLLCMiss instr must contain loop induction var\n";
-    exit(1);
-  }
+  for (unsigned i=0; i<TopLLCMissInstrs.size(); i++){
+    MCInst PrefetchInst;
+    MCInst tmp;
+    if (TopLLCMissInstrs[i]->getOperand(1).getReg()==LoopInductionInstr->getOperand(1).getReg()){
+      BC.MIB->createPrefetchT0Expr(PrefetchInst, freeReg, TopLLCMissInstrs[i]->getOperand(4).getExpr(), BC.MIB->getNoRegister(), TopLLCMissInstrs[i]->getOperand(2).getImm(), BC.MIB->getNoRegister(), tmp);
+    }
+    else if (TopLLCMissInstrs[i]->getOperand(3).getReg()==LoopInductionInstr->getOperand(1).getReg()){
+      BC.MIB->createPrefetchT0Expr(PrefetchInst, TopLLCMissInstrs[i]->getOperand(1).getReg(), TopLLCMissInstrs[i]->getOperand(4).getExpr(), freeReg, TopLLCMissInstrs[i]->getOperand(2).getImm(), BC.MIB->getNoRegister(), tmp);
+    }
+    else{
+      llvm::outs()<<"[InjectPrefetchLitePass] TopLLCMiss instr must contain loop induction var\n";
+      exit(1);
+    }
 
-  PrefetchBBs.back()->addInstruction(PrefetchInst);
-
+    PrefetchBBs.back()->addInstruction(PrefetchInst);
+  }
   // create unconditional branch at the end of 
   // prefetchBB
   PrefetchBBs.back()->addBranchInstruction(TopLLCMissBB);  

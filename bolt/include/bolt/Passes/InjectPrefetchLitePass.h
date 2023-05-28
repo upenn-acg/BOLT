@@ -35,7 +35,7 @@ public:
                                         MCInst*, MCInst*, MCInst*,
                                         int prefetchDist, MCPhysReg);
   BinaryBasicBlock* createPrefetchBB(BinaryFunction&, BinaryBasicBlock*,
-                                     BinaryBasicBlock*, MCInst*, MCInst*, 
+                                     BinaryBasicBlock*, std::vector<MCInst*>, MCInst*, 
                                      int prefetchDist, MCPhysReg);
 
 private:

@@ -1229,7 +1229,7 @@ bool BinaryFunction::disassemble() {
       std::string line;
       while (getline(f, line)) {
          std::vector<std::string> words = splitLine(line);
-         if (words.size()==2){
+         if (words.size()>1){
             uint64_t addr = stoi(words[1], 0, 16);
             locations.insert(make_pair(words[0], addr));
          }
