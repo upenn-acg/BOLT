@@ -52,8 +52,6 @@ bool InjectPrefetchLitePass::runOnFunction(BinaryFunction &BF) {
     TopLLCMissAddrs_set.insert(TopLLCMissAddrs[i]);
   }
 
-  llvm::outs()<<"@@@@@@@@@@@@@@@@@@@@\n";
-
   // get the Instruction and Basic Block that contains 
   // the TOP LLC miss instruction. 
   BinaryBasicBlock* TopLLCMissBB = NULL;

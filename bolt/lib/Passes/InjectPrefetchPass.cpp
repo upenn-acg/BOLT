@@ -76,6 +76,14 @@ bool InjectPrefetchPass::runOnFunction(BinaryFunction &BF) {
     }
   }
 
+  SmallVector<BinaryBasicBlock*, 0> PredsOfTopLLCMissBB = TopLLCMissBB->getPredecessors(); 
+  for (unsigned i=0; i<PredsOfTopLLCMissBB.size(); i++){
+    if(PredsOfTopLLCMissBB[i] == TopLLCMissBB){
+      return false;
+    }
+  }
+  
+
   // get the loop (OuterLoop) that contains the Top LLC miss BB
   // later on we need to utilize the Header Basic Block of this 
   // loop
