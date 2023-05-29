@@ -67,6 +67,7 @@ bool InjectPrefetchPass::runOnFunction(BinaryFunction &BF) {
             llvm::outs()<<"[InjectPrefetchPass] TOP LLC miss instruction is a store\n";
           }
           else {
+            llvm::outs()<<"[InjectPrefetchPass] This pass only inject prefetch for load or store instruction\n";
             return false;
           }  
           TopLLCMissBB = &BB;
