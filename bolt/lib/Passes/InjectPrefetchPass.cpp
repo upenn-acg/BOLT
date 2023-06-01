@@ -214,11 +214,6 @@ bool InjectPrefetchPass::runOnFunction(BinaryFunction &BF) {
   // inject pop %rax to the Loop Header.
   // pop instruction should be the first instruction of 
   // the HeaderBB
-  auto Loc = HeaderBB->begin();
-  MCInst PopInst; 
-  BC.MIB->createPopRegister(PopInst, freeReg, 8);
-  HeaderBB->insertRealInstruction(Loc, PopInst);
-
 
 
   // create BoundsCheckBB and PrefetchBB
@@ -259,7 +254,16 @@ bool InjectPrefetchPass::runOnFunction(BinaryFunction &BF) {
     if (LastBranchTargetSymbol==HeaderBB->getLabel()){
       BC.MIB->replaceBranchTarget(*LastBranch, BoundsCheckBB->getLabel(), BC.Ctx.get());
     }
+    else{
+      PredsOfHeaderBB[i]->addBranchInstruction(BoundsCheckBB);
+    }
   }
+
+  auto Loc = HeaderBB->begin();
+  MCInst PopInst; 
+  BC.MIB->createPopRegister(PopInst, freeReg, 8);
+  HeaderBB->insertRealInstruction(Loc, PopInst);
+
 
   return true;
 }
@@ -562,6 +566,7 @@ BinaryBasicBlock* InjectPrefetchPass::createPrefetchBB(BinaryFunction& BF,
 
   BinaryContext& BC = BF.getBinaryContext();
   MCInst DemandLoadInstr = *(predLoadInstrs[1]); 
+   
   // create prefetchBB
   // in prefetchBB it contains
   // mov 0x200(%r9,%rdx,8),%rax 
