@@ -29,8 +29,9 @@ public:
   bool runOnFunction(BinaryFunction &Function);
   std::pair<MCInst*, BinaryBasicBlock*> findDemandLoad( BinaryFunction&, BinaryLoop*, 
                                                         MCInst*, BinaryBasicBlock*);
-  BinaryLoop* getOuterLoopForBB( BinaryFunction&, 
-                                 BinaryBasicBlock*);
+  BinaryLoop* getWorkingLoop( BinaryFunction&, 
+                              BinaryBasicBlock*, MCInst*,
+                              MCInst**, MCInst**);
   BinaryBasicBlock* createBoundsCheckBB(BinaryFunction&, BinaryBasicBlock*,
                                         MCInst*, MCInst*, MCInst*,
                                         int prefetchDist, MCPhysReg);
