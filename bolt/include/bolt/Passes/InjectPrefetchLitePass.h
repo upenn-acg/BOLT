@@ -38,6 +38,11 @@ public:
   BinaryBasicBlock* createPrefetchBB(BinaryFunction&, BinaryBasicBlock*,
                                      BinaryBasicBlock*, std::vector<MCInst*>, MCInst*, 
                                      int prefetchDist, MCPhysReg);
+  void getLoopGuardInstrs( BinaryFunction& BF,
+                           BinaryLoop* workingLoop,
+                           MCInst* TopLLCMissInstr,
+                           MCInst** LoopInductionInstr,
+                           MCInst** LoopGuardCMPInstr); 
 
 private:
   std::unordered_map<std::string, std::vector<uint64_t>> TopLLCMissLocations;

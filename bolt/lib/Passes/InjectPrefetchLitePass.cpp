@@ -85,7 +85,7 @@ bool InjectPrefetchLitePass::runOnFunction(BinaryFunction &BF) {
       }
     }
   }
-/*
+
   std::unordered_map<BinaryLoop*, std::unordered_set<uint64_t> > LoopContainsTopLLCMissInstrs;
   for (auto it = TopLLCMissAddrGroups.begin(); it != TopLLCMissAddrGroups.end(); it++){
     BinaryBasicBlock* TopLLCMissBB = it->first;
@@ -108,52 +108,48 @@ bool InjectPrefetchLitePass::runOnFunction(BinaryFunction &BF) {
 
     if (LoopContainsTopLLCMissInstrs.find(workingLoop) != LoopContainsTopLLCMissInstrs.end()){
       for (auto I: TopLLCMissInstrsInThisBB){
-         LoopContainsTopLLCMissInstrs[workingLoop].insert((uint64_t)BC.MIB->getAnnotationAs<uint64_t>(I, "AbsoluteAddr"));
+         LoopContainsTopLLCMissInstrs[workingLoop].insert((uint64_t)BC.MIB->getAnnotationAs<uint64_t>(*I, "AbsoluteAddr"));
       }
+    }
+    else {
+      std::unordered_set<uint64_t> newSet;
+      for (auto I: TopLLCMissInstrsInThisBB){
+         newSet.insert((uint64_t)BC.MIB->getAnnotationAs<uint64_t>(*I, "AbsoluteAddr"));
+      }
+      LoopContainsTopLLCMissInstrs.insert(std::make_pair(workingLoop, newSet));
     }
   }
-*/
 
-  while (!TopLLCMissAddrGroups.empty()){
-    BinaryBasicBlock* TopLLCMissBB = TopLLCMissAddrGroups.begin()->first;
-    std::vector<MCInst*> TopLLCMissInstrsInThisBB;
-    for (auto It = TopLLCMissBB->begin(); It != TopLLCMissBB->end(); It++){
-      if (BC.MIB->hasAnnotation(*It, "AbsoluteAddr")){
-        uint64_t AbsoluteAddr = (uint64_t)BC.MIB->getAnnotationAs<uint64_t>(*It, "AbsoluteAddr");
-        if (TopLLCMissAddrs_set.find(AbsoluteAddr) != TopLLCMissAddrs_set.end()){
-          TopLLCMissInstrsInThisBB.push_back(&(*It));
+
+  while (!LoopContainsTopLLCMissInstrs.empty()){
+    BinaryLoop* workingLoop = LoopContainsTopLLCMissInstrs.begin()->first;
+    llvm::outs()<< LoopContainsTopLLCMissInstrs.begin()->second.size();
+    std::vector<MCInst*> TopLLCMissInstrsInThisFunc;
+    for(BinaryBasicBlock* BB : workingLoop->getBlocks()){
+      for (auto I = BB->begin(); I != BB->end(); I++){
+        if (BC.MIB->hasAnnotation(*I, "AbsoluteAddr")){
+          uint64_t AbsoluteAddr = (uint64_t)BC.MIB->getAnnotationAs<uint64_t>(*I, "AbsoluteAddr");
+          if (TopLLCMissAddrs_set.find(AbsoluteAddr) != TopLLCMissAddrs_set.end()){
+            TopLLCMissInstrsInThisFunc.push_back(&(*I));
+          }
         }
       }
     }
-    MCInst* TopLLCMissInstr = TopLLCMissInstrsInThisBB[0];
-    bool canInject = true;
-    for (unsigned i=0; i < TopLLCMissInstrsInThisBB.size(); i++){
-      MCInst* topllcmissinstr = TopLLCMissInstrsInThisBB[i];
-      for (int j=1; j<topllcmissinstr->getNumOperands(); j++){
-        if ((topllcmissinstr->getOperand(j).isReg()) && 
-            (topllcmissinstr->getOperand(j).getReg() != TopLLCMissInstr->getOperand(j).getReg())){
-          canInject = false;
-          break;
-        }
-      } 
-    }
-    if (!canInject){
-       TopLLCMissAddrGroups.erase(TopLLCMissAddrGroups.begin());
-       continue;
-    }
+    
+    llvm::outs()<<"@@@@ size = "<<TopLLCMissInstrsInThisFunc.size()<<"\n";
+    MCInst* TopLLCMissInstr = TopLLCMissInstrsInThisFunc[0];
+
     // get the working loop, also update the LoopInductionInstr
     // and LoopGuardCMPInstr
     MCInst* LoopInductionInstr = NULL;
     MCInst* LoopGuardCMPInstr = NULL;
 
-    BinaryLoop* workingLoop = getWorkingLoop( BF,TopLLCMissBB,TopLLCMissInstr, 
-                                              &LoopInductionInstr, &LoopGuardCMPInstr);
+    getLoopGuardInstrs( BF,
+                        workingLoop,
+                        TopLLCMissInstr,
+                        &LoopInductionInstr,
+                        &LoopGuardCMPInstr);
 
-    if (workingLoop==NULL) {
-      llvm::outs()<<"[InjectPrefetchLitePass] TopLLCMissInstr is not in a loop\n";
-      return false;
-    }
- 
     BinaryBasicBlock* HeaderBB = workingLoop->getHeader(); 
 
     // create BoundsCheckBB and PrefetchBB
@@ -192,7 +188,7 @@ bool InjectPrefetchLitePass::runOnFunction(BinaryFunction &BF) {
                                                           freeReg);
 
     BinaryBasicBlock* PrefetchBB = createPrefetchBB(BF, HeaderBB, BoundsCheckBB, 
-                                                    TopLLCMissInstrsInThisBB, LoopInductionInstr, prefetchDist, 
+                                                    TopLLCMissInstrsInThisFunc, LoopInductionInstr, prefetchDist, 
                                                     freeReg);
 
     // change the control-flow-graph 
@@ -249,7 +245,7 @@ bool InjectPrefetchLitePass::runOnFunction(BinaryFunction &BF) {
     BC.MIB->createPopRegister(PopInst, freeReg, 8);
     HeaderBB->insertRealInstruction(Loc, PopInst);
 
-    TopLLCMissAddrGroups.erase(TopLLCMissAddrGroups.begin());
+    LoopContainsTopLLCMissInstrs.erase(LoopContainsTopLLCMissInstrs.begin());
   }
   return true;
 }
@@ -375,6 +371,79 @@ BinaryLoop* InjectPrefetchLitePass::getWorkingLoop( BinaryFunction& BF,
   }
 
   return NULL;
+}
+
+
+
+void InjectPrefetchLitePass::getLoopGuardInstrs( BinaryFunction& BF,
+                                                 BinaryLoop* workingLoop,
+                                                 MCInst* TopLLCMissInstr,
+                                                 MCInst** LoopInductionInstr,
+                                                 MCInst** LoopGuardCMPInstr){
+  BinaryContext& BC = BF.getBinaryContext();
+  // get loop info of this function
+  SmallVector<BinaryBasicBlock *, 1> Latches;
+  if (workingLoop->getBlocks().size()==1){
+    BinaryBasicBlock* Latch = workingLoop->getBlocks()[0];
+    Latches.clear();
+    Latches.push_back(Latch);
+  }
+  else {
+    workingLoop->getLoopLatches(Latches);
+  }
+
+  for (auto &Latch: Latches){
+    *LoopInductionInstr = NULL;
+    *LoopGuardCMPInstr = NULL;
+    // get all potential loop induction instructions
+    for (auto I = Latch->begin(); I != Latch->end(); I++){
+      MCInst instr = *I;
+      if ((BC.MIB->isADD(instr)) && (instr.getOperand(2).isImm())) {
+        if (BC.MIB->hasAnnotation(*TopLLCMissInstr, "AbsoluteAddr")){
+          uint64_t AbsoluteAddr = (uint64_t)BC.MIB->getAnnotationAs<uint64_t>(*TopLLCMissInstr, "AbsoluteAddr");    
+          llvm::outs()<<"@@@ TopLLCMissAddr = "<<utohexstr(AbsoluteAddr)<<"\n";
+        }
+
+        if ((TopLLCMissInstr->getOperand(3).getReg()==instr.getOperand(0).getReg())){
+          *LoopInductionInstr = &(*I); 
+          break;
+        }
+        else if ((TopLLCMissInstr->getOperand(1).getReg()==instr.getOperand(0).getReg())){
+          *LoopInductionInstr = &(*I); 
+          break;
+        }
+      }
+    }
+    if (*LoopInductionInstr){
+      for (auto I = Latch->begin(); I != Latch->end(); I++){
+        MCInst instr = *I;
+        if (BC.MIB->isCMP(instr)){
+          for (unsigned j=0; j<instr.getNumOperands(); j++){
+            if (instr.getOperand(j).isReg()){
+              // the third operand of DemandLoadInstr is the index register
+              // namely the loop induction variable
+              if ((*LoopInductionInstr)->getOperand(0).getReg()==instr.getOperand(j).getReg()){
+                *LoopGuardCMPInstr = &(*I);
+                break;
+              }
+              else if (BC.MIB->isLower32bitReg((*LoopInductionInstr)->getOperand(0).getReg(), instr.getOperand(j).getReg())){
+                *LoopGuardCMPInstr = &(*I);
+                break;
+              }
+            }
+          }
+        }
+      }
+    }
+
+    if (*LoopGuardCMPInstr){
+      if (BC.MIB->hasAnnotation(**LoopGuardCMPInstr, "AbsoluteAddr")){
+        uint64_t AbsoluteAddr = (uint64_t)BC.MIB->getAnnotationAs<uint64_t>(**LoopGuardCMPInstr, "AbsoluteAddr");    
+        llvm::outs()<<"@@@ LoopGuardCMPInsts's addr = "<<utohexstr(AbsoluteAddr)<<"\n";
+      }
+    }
+  }
+  return;
 }
 
 
