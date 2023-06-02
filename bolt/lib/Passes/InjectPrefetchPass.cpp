@@ -120,9 +120,11 @@ bool InjectPrefetchPass::runOnFunction(BinaryFunction &BF) {
     predLoadInstrs.push_back(predLoad);
     auto newDemandLoadPkg = findDemandLoad(BF, OuterLoop, predLoad, predLoadBB);
     predLoad = newDemandLoadPkg.first;
+    if (predLoad == NULL) break;
+
     predLoadBB = newDemandLoadPkg.second;
   }
-  predLoadInstrs.push_back(predLoad);
+  if (predLoad !=NULL) predLoadInstrs.push_back(predLoad);
  
   MCInst DemandLoadInstr = *(predLoadInstrs[1]);
 
@@ -141,7 +143,8 @@ bool InjectPrefetchPass::runOnFunction(BinaryFunction &BF) {
   llvm::outs()<<"[InjectPrefetchPass] number of latches in the outer loop: "<< Latches.size()<<"\n";
 
   if (Latches.size()==0) return false;
-  
+ 
+ 
   // Here we assume that LoopInductionInstr is always 
   // LoopGuradCMPInstr. This is a reasonable assumption 
   // because after the loopGuardCMPInstr, the Latch will 
@@ -385,7 +388,7 @@ std::pair<MCInst*, BinaryBasicBlock*> InjectPrefetchPass::findDemandLoad(BinaryF
         MCInst* DemandLoadInThisBB = NULL;
         for (auto It = currentBB->begin(); It != currentBB->end(); It++){
           MCInst &Instr = *It;
-          if ((BC.MIB->isLoad(Instr)) && (Instr.getOperand(0).getReg()==DemandLoadDstRegNum)){
+          if ((BC.MIB->isLoad(Instr)) &&(!BC.MIB->isCMP(Instr))&& (Instr.getOperand(0).getReg()==DemandLoadDstRegNum)){
              DemandLoadInThisBB = &Instr;
           }
         }
