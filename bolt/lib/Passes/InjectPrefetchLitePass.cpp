@@ -136,7 +136,6 @@ bool InjectPrefetchLitePass::runOnFunction(BinaryFunction &BF) {
       }
     }
     
-    llvm::outs()<<"@@@@ size = "<<TopLLCMissInstrsInThisFunc.size()<<"\n";
     MCInst* TopLLCMissInstr = TopLLCMissInstrsInThisFunc[0];
 
     // get the working loop, also update the LoopInductionInstr
