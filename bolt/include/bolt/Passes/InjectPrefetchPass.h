@@ -15,14 +15,26 @@ namespace llvm {
 namespace bolt {
 
 class InjectPrefetchPass : public BinaryFunctionPass {
+private:
+  std::unordered_map<std::string, std::unordered_set<uint64_t>> TopLLCMissLocations;
+  typedef struct TopLLCMissInfo{
+    BinaryBasicBlock* TopLLCMissBB;
+    MCInst* TopLLCMissInstr;
+    BinaryLoop* OuterLoop;
+    std::vector<MCInst*> predLoadInstrs;
+    MCInst DemandLoadInstr;  // the second element of predLoadInstrs
+    MCPhysReg freeReg;
+  } TopLLCMissInfo;
+
 public:
   explicit InjectPrefetchPass() : BinaryFunctionPass(false) {}
 
   const char *getName() const override { return "inject-prefetch"; }
   /// Helper functions
-  std::unordered_map<std::string, uint64_t> getTopLLCMissLocationFromFile();
+  //std::unordered_map<std::string, uint64_t> getTopLLCMissLocationFromFile();
   std::vector<std::string> splitLine(std::string);
   std::string removeSuffix(std::string);
+  std::unordered_map<std::string, std::unordered_set<uint64_t>> getTopLLCMissLocationFromFile();
   /// real functions
   void runOnFunctions(BinaryContext &BC) override;
   bool runOnFunction(BinaryFunction &Function);
@@ -32,14 +44,10 @@ public:
                                  BinaryBasicBlock*);
   BinaryBasicBlock* createBoundsCheckBB(BinaryFunction&, BinaryBasicBlock*,
                                         MCInst*, MCInst*, MCInst, int prefetchDist,
-                                        MCPhysReg);
+                                        std::vector<TopLLCMissInfo>);
   BinaryBasicBlock* createPrefetchBB(BinaryFunction&, BinaryBasicBlock*,
-                                     BinaryBasicBlock*, std::vector<MCInst*>, 
-                                     int prefetchDist, MCPhysReg);
-
-
-private:
-  std::unordered_map<std::string, uint64_t> TopLLCMissLocations;
+                                     BinaryBasicBlock*, int prefetchDist, 
+                                     std::vector<TopLLCMissInfo>);
 };
 
 } // namespace bolt
