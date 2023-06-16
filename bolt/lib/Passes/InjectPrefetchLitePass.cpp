@@ -94,7 +94,6 @@ bool InjectPrefetchLitePass::runOnFunction(BinaryFunction &BF) {
     }
   }
 
-
   // create BoundsCheckBB and PrefetchBB
   SmallVector<BinaryBasicBlock*, 0> PredsOfTopLLCMissBB = TopLLCMissBB->getPredecessors();
   

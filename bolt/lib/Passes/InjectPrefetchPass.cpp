@@ -39,7 +39,6 @@ bool InjectPrefetchPass::runOnFunction(BinaryFunction &BF) {
   uint64_t startingAddr = BF.getAddress();
   int prefetchDist = opts::PrefetchDistance;
   std::string demangledFuncName = removeSuffix(BF.getDemangledName());
-  //uint64_t TopLLCMissAddr = TopLLCMissLocations[demangledFuncName];
   std::unordered_set<uint64_t> TopLLCMissAddrs = TopLLCMissLocations[demangledFuncName];
   uint64_t TopLLCMissAddr = *(TopLLCMissAddrs.begin());
 
@@ -47,7 +46,6 @@ bool InjectPrefetchPass::runOnFunction(BinaryFunction &BF) {
               <<utohexstr(startingAddr)<<"\n";
   llvm::outs()<<"[InjectPrefetchPass] The top llc miss addr is: 0x"
               <<utohexstr(TopLLCMissAddr)<<"\n";
-
 
 
   std::vector<BinaryBasicBlock*> TopLLCMissBBs;
@@ -252,9 +250,11 @@ bool InjectPrefetchPass::runOnFunction(BinaryFunction &BF) {
                                                         prefetchDist,
                                                         TopLLCMissInfos);
 
+
   BinaryBasicBlock* PrefetchBB = createPrefetchBB(BF, HeaderBB, BoundsCheckBB, 
                                                   prefetchDist, 
                                                   TopLLCMissInfos);
+
 
   // change the control-flow-graph 
   // first add set PrefetchBB to be the successor of
@@ -286,13 +286,13 @@ bool InjectPrefetchPass::runOnFunction(BinaryFunction &BF) {
   }
 
   auto Loc = HeaderBB->begin();
+
   for (unsigned i=TopLLCMissInfos.size(); i>0; i--){
     MCInst PopInst; 
     BC.MIB->createPopRegister(PopInst, TopLLCMissInfos[i-1].freeReg, 8);
-    HeaderBB->insertRealInstruction(Loc, PopInst);
+    Loc = HeaderBB->insertRealInstruction(Loc, PopInst);
     Loc++;
   }
-
 
   return true;
 }
@@ -610,6 +610,7 @@ BinaryBasicBlock* InjectPrefetchPass::createPrefetchBB(BinaryFunction& BF,
   // add the load instructiona that compute the target address
   // for prefetch. 
   // Note: here might be a dependency chain.
+
   for (unsigned k=0; k<TopLLCMissInfos.size(); k++){ 
     MCPhysReg freeReg = TopLLCMissInfos[k].freeReg;
     for (unsigned idx = TopLLCMissInfos[k].predLoadInstrs.size()-1 ; idx > 1 ; idx --){
@@ -661,6 +662,7 @@ BinaryBasicBlock* InjectPrefetchPass::createPrefetchBB(BinaryFunction& BF,
 
     PrefetchBBs.back()->addInstruction(PrefetchInst);
   }
+
   // create unconditional branch at the end of 
   // prefetchBB
   PrefetchBBs.back()->addBranchInstruction(HeaderBB);  
