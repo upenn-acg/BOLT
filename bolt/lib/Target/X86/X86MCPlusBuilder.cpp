@@ -2897,6 +2897,156 @@ public:
   }
 
 
+
+  MCPhysReg getLower32bitReg( const MCPhysReg fullReg) const override{
+    if (fullReg == X86::RAX){
+      return X86::EAX;
+    }
+    else if (fullReg == X86::RBX){
+      return X86::EBX;
+    }
+    else if (fullReg == X86::RCX){
+      return X86::ECX;
+    }
+    else if (fullReg == X86::RDX){
+      return X86::EDX;
+    }
+    else if (fullReg == X86::RSI){
+      return X86::ESI;
+    }
+    else if (fullReg == X86::RDI){
+      return X86::EDI;
+    }
+    else if (fullReg == X86::RSP){
+      return X86::ESP;
+    }
+    else if (fullReg == X86::RBP){
+      return X86::EBP;
+    }
+    else if (fullReg == X86::R9){
+      return X86::R9D;
+    }
+    else if (fullReg == X86::R10){
+      return X86::R10D;
+    }
+    else if (fullReg == X86::R11){
+      return X86::R11D;
+    }
+    else if (fullReg == X86::R12){
+      return X86::R12D;
+    }
+    else if (fullReg == X86::R13){
+      return X86::R13D;
+    }
+    else if (fullReg == X86::R14){
+      return X86::R14D;
+    }
+    else if (fullReg == X86::R15){
+      return X86::R15D;
+    }
+    else{
+      llvm::errs()<<"BOLT-ERROR: isLower32bitReg() doesn't support this regsiter\n";
+      exit(-1);
+    }
+  }
+
+  MCPhysReg get64bitReg (const MCPhysReg Reg) const override{
+    if (Reg == X86::EAX){
+      return X86::RAX;
+    }
+    else if (Reg == X86::EBX){
+      return X86::RBX;
+    }
+    else if (Reg == X86::ECX){
+      return X86::RCX;
+    }
+    else if (Reg == X86::EDX){
+      return X86::RDX;
+    }
+    else if (Reg == X86::ESI){
+      return X86::RSI;
+    }
+    else if (Reg == X86::EDI){
+      return X86::RDI;
+    }
+    else if (Reg == X86::ESP){
+      return X86::RSP;
+    }
+    else if (Reg == X86::EBP){
+      return X86::EBP;
+    }
+    else if (Reg == X86::R9D){
+      return X86::R9;
+    }
+    else if (Reg == X86::R10D){
+      return X86::R10;
+    }
+    else if (Reg == X86::R11D){
+      return X86::R11;
+    }
+    else if (Reg == X86::R12D){
+      return X86::R12;
+    }
+    else if (Reg == X86::R13D){
+      return X86::R13;
+    }
+    else if (Reg == X86::R14D){
+      return X86::R14;
+    }
+    else if (Reg == X86::R15D){
+      return X86::R15;
+    }
+    else{
+      llvm::errs()<<"BOLT-ERROR: isLower32bitReg() doesn't support this regsiter\n";
+      exit(-1);
+    }
+  }
+
+
+  bool is64bitReg (const MCPhysReg Reg) const override{
+    switch(Reg){
+      case X86::RAX:
+      case X86::RBX:
+      case X86::RCX:
+      case X86::RDX:
+      case X86::RSI:
+      case X86::RDI:
+      case X86::RSP:
+      case X86::RBP:
+      case X86::R9:
+      case X86::R10:
+      case X86::R11:
+      case X86::R12:
+      case X86::R13:
+      case X86::R14:
+      case X86::R15: return true;
+      default: return false;
+    }
+  }
+
+  bool is32bitReg (const MCPhysReg Reg) const override{
+    switch(Reg){
+      case X86::EAX:
+      case X86::EBX:
+      case X86::ECX:
+      case X86::EDX:
+      case X86::ESI:
+      case X86::EDI:
+      case X86::ESP:
+      case X86::EBP:
+      case X86::R9D:
+      case X86::R10D:
+      case X86::R11D:
+      case X86::R12D:
+      case X86::R13D:
+      case X86::R14D:
+      case X86::R15D: return true;
+      default: return false;
+    }
+  }
+
+
+
   MCPhysReg getUnusedReg(std::unordered_set<MCPhysReg> usedRegs) const override{
     std::set<int>regs({X86::RAX, X86::RBX, X86::RCX, X86::RDX, X86::RSI, X86::RDI, X86::RBP, X86::R9, X86::R10, X86::R11, X86::R12, X86::R13, X86::R14, X86::R15});
     for (auto it = regs.begin(); it!=regs.end(); it++){

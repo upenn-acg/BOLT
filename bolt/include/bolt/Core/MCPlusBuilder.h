@@ -1570,6 +1570,26 @@ public:
     return false;
   }
 
+  virtual bool is64bitReg (const MCPhysReg Reg) const{
+    llvm_unreachable("not implemented");
+    return false;
+  }
+
+  virtual bool is32bitReg (const MCPhysReg Reg) const{
+    llvm_unreachable("not implemented");
+    return false;
+  }
+
+  virtual MCPhysReg get64bitReg (const MCPhysReg Reg) const{
+    llvm_unreachable("not implemented");
+    return getNoRegister();
+  }
+
+  virtual MCPhysReg getLower32bitReg (const MCPhysReg Reg) const{
+    llvm_unreachable("not implemented");
+    return getNoRegister();
+  }
+
   virtual MCPhysReg getUnusedReg(std::unordered_set<MCPhysReg> usedRegs) const{
     llvm_unreachable("not implemented");
     return getNoRegister();;
