@@ -16,7 +16,7 @@ namespace bolt {
 
 class InjectPrefetchPass : public BinaryFunctionPass {
 private:
-  std::unordered_map<std::string, std::unordered_set<uint64_t>> TopLLCMissLocations;
+  std::unordered_map<std::string, std::unordered_map<uint64_t,long>> TopLLCMissLocations;
   typedef struct TopLLCMissInfo{
     BinaryBasicBlock* TopLLCMissBB;
     MCInst* TopLLCMissInstr;
@@ -25,6 +25,7 @@ private:
     MCInst DemandLoadInstr;  // the second element of predLoadInstrs
     BinaryBasicBlock* BoundsCheckBB;
     BinaryBasicBlock* PrefetchBB;
+    long prefetchDist;
   } TopLLCMissInfo;
 
 public:
@@ -35,7 +36,7 @@ public:
   //std::unordered_map<std::string, uint64_t> getTopLLCMissLocationFromFile();
   std::vector<std::string> splitLine(std::string);
   std::string removeSuffix(std::string);
-  std::unordered_map<std::string, std::unordered_set<uint64_t>> getTopLLCMissLocationFromFile();
+  std::unordered_map<std::string, std::unordered_map<uint64_t, long>> getTopLLCMissLocationFromFile();
   /// real functions
   void runOnFunctions(BinaryContext &BC) override;
   bool runOnFunction(BinaryFunction &Function);

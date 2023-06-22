@@ -27,7 +27,7 @@ extern cl::OptionCategory BoltCategory;
 
 extern cl::opt<bool> InjectPrefetch;
 extern cl::opt<std::string> PrefetchLocationFile;
-extern cl::opt<unsigned> PrefetchDistance;
+//extern cl::opt<unsigned> PrefetchDistance;
 } // namespace opts
 
 namespace llvm {
@@ -37,15 +37,14 @@ bool InjectPrefetchPass::runOnFunction(BinaryFunction &BF) {
 
   BinaryContext& BC = BF.getBinaryContext();
   uint64_t startingAddr = BF.getAddress();
-  int prefetchDist = opts::PrefetchDistance;
+  //int prefetchDist = opts::PrefetchDistance;
   std::string demangledFuncName = removeSuffix(BF.getDemangledName());
-  std::unordered_set<uint64_t> TopLLCMissAddrs = TopLLCMissLocations[demangledFuncName];
-  uint64_t TopLLCMissAddr = *(TopLLCMissAddrs.begin());
+  //std::unordered_set<uint64_t> TopLLCMissAddrs = TopLLCMissLocations[demangledFuncName];
+  std::unordered_map<uint64_t, long> TopLLCMissAddrAndPrefDist = TopLLCMissLocations[demangledFuncName];
+  //uint64_t TopLLCMissAddr = *(TopLLCMissAddrs.begin());
 
   llvm::outs()<<"[InjectPrefetchPass] The starting address of "<<demangledFuncName<<" is: 0x"
               <<utohexstr(startingAddr)<<"\n";
-  llvm::outs()<<"[InjectPrefetchPass] The top llc miss addr is: 0x"
-              <<utohexstr(TopLLCMissAddr)<<"\n";
 
 
   std::vector<BinaryBasicBlock*> TopLLCMissBBs;
@@ -58,7 +57,7 @@ bool InjectPrefetchPass::runOnFunction(BinaryFunction &BF) {
       MCInst &Instr = *It;
       if (BC.MIB->hasAnnotation(Instr, "AbsoluteAddr")){
         uint64_t AbsoluteAddr = (uint64_t)BC.MIB->getAnnotationAs<uint64_t>(Instr, "AbsoluteAddr");        
-        if ( TopLLCMissAddrs.find(AbsoluteAddr) != TopLLCMissAddrs.end() ){
+        if ( TopLLCMissAddrAndPrefDist.find(AbsoluteAddr) != TopLLCMissAddrAndPrefDist.end() ){
           llvm::outs()<<"[InjectPrefetchPass] find instruction that causes the TOP LLC miss\n";
           if (BC.MIB->isLoad(Instr)){
             llvm::outs()<<"[InjectPrefetchPass] TOP LLC miss instruction is a load\n";           
@@ -75,6 +74,7 @@ bool InjectPrefetchPass::runOnFunction(BinaryFunction &BF) {
           TopLLCMissInfo newInfo;
           newInfo.TopLLCMissBB = &BB;
           newInfo.TopLLCMissInstr = &Instr;
+          newInfo.prefetchDist = TopLLCMissAddrAndPrefDist[AbsoluteAddr];
           TopLLCMissInfos.push_back(newInfo); 
         }
       }
@@ -158,8 +158,7 @@ bool InjectPrefetchPass::runOnFunction(BinaryFunction &BF) {
   llvm::outs()<<"[InjectPrefetchPass] number of latches in the outer loop: "<< Latches.size()<<"\n";
 
   if (Latches.size()==0) return false;
- 
- 
+  
   // Here we assume that LoopInductionInstr is always 
   // LoopGuradCMPInstr. This is a reasonable assumption 
   // because after the loopGuardCMPInstr, the Latch will 
@@ -245,12 +244,12 @@ bool InjectPrefetchPass::runOnFunction(BinaryFunction &BF) {
       TopLLCMissInfos[i].BoundsCheckBB = createBoundsCheckBB0(BF, HeaderBB, 
                                                               LoopGuardCMPInstr,
                                                               LoopInductionInstr, 
-                                                              prefetchDist,
+                                                              TopLLCMissInfos[i].prefetchDist,
                                                               freeReg);
 
       TopLLCMissInfos[i].PrefetchBB = createPrefetchBB(BF, TopLLCMissInfos[i].BoundsCheckBB,
                                                        TopLLCMissInfos[i].predLoadInstrs, 
-                                                       prefetchDist, 
+                                                       TopLLCMissInfos[i].prefetchDist, 
                                                        freeReg);
 
       // change the control-flow-graph 
@@ -278,12 +277,12 @@ bool InjectPrefetchPass::runOnFunction(BinaryFunction &BF) {
                                                              TopLLCMissInfos[i-1].PrefetchBB, 
                                                              LoopGuardCMPInstr,
                                                              LoopInductionInstr, 
-                                                             prefetchDist,
+                                                             TopLLCMissInfos[i].prefetchDist,
                                                              freeReg);
 
       TopLLCMissInfos[i].PrefetchBB = createPrefetchBB1(BF, HeaderBB, TopLLCMissInfos[i].BoundsCheckBB,
                                                         TopLLCMissInfos[i].predLoadInstrs, 
-                                                        prefetchDist, 
+                                                        TopLLCMissInfos[i].prefetchDist, 
                                                         freeReg);
 
       TopLLCMissInfos[i].BoundsCheckBB->addSuccessor(TopLLCMissInfos[i].PrefetchBB);
@@ -293,12 +292,12 @@ bool InjectPrefetchPass::runOnFunction(BinaryFunction &BF) {
                                                              TopLLCMissInfos[i-1].PrefetchBB, 
                                                              LoopGuardCMPInstr,
                                                              LoopInductionInstr, 
-                                                             prefetchDist,
+                                                             TopLLCMissInfos[i].prefetchDist,
                                                              freeReg);
 
       TopLLCMissInfos[i].PrefetchBB = createPrefetchBB(BF, TopLLCMissInfos[i].BoundsCheckBB,
                                                        TopLLCMissInfos[i].predLoadInstrs, 
-                                                       prefetchDist,
+                                                       TopLLCMissInfos[i].prefetchDist,
                                                        freeReg);
 
       TopLLCMissInfos[i].BoundsCheckBB->addSuccessor(TopLLCMissInfos[i].PrefetchBB);
@@ -911,51 +910,9 @@ std::vector<std::string> InjectPrefetchPass::splitLine(std::string str){
 
 
 
-/*
-std::unordered_map<std::string, uint64_t> InjectPrefetchPass::getTopLLCMissLocationFromFile(){
-   std::unordered_map<std::string, uint64_t> locations;
 
-   std::string FileName = opts::PrefetchLocationFile; 
-   std::fstream f;
-   f.open(FileName, std::ios::in); 
-    
-   if (f.is_open()) { 
-      std::string line;
-      while (getline(f, line)) { 
-         std::vector<std::string> words = splitLine(line); 
-         if (words.size()>1){
-            uint64_t addr = stoi(words[1], 0, 16);
-            locations.insert(make_pair(words[0], addr));
-         }
-         llvm::outs() << line << "\n"; 
-      }
-        
-      // Close the file object.
-      f.close(); 
-   }
-   return locations;
-}
-
-
-
-
-std::vector<std::string> InjectPrefetchPass::splitLine(std::string str){
-   std::vector<std::string> words;
-   std::stringstream ss(str);
-   std::string tmp;
-   while (ss >> tmp){
-      words.push_back(tmp);
-      tmp.clear();
-   }
-   return words;
-}
-*/
-
-
-
-
-std::unordered_map<std::string, std::unordered_set<uint64_t>> InjectPrefetchPass::getTopLLCMissLocationFromFile(){
-   std::unordered_map<std::string, std::unordered_set<uint64_t>> locations;
+std::unordered_map<std::string, std::unordered_map<uint64_t, long>> InjectPrefetchPass::getTopLLCMissLocationFromFile(){
+   std::unordered_map<std::string, std::unordered_map<uint64_t, long>> locations;
 
    std::string FileName = opts::PrefetchLocationFile; 
    std::fstream f;
@@ -965,12 +922,17 @@ std::unordered_map<std::string, std::unordered_set<uint64_t>> InjectPrefetchPass
       std::string line;
       while (getline(f, line)) { 
          std::vector<std::string> words = splitLine(line);
-         std::unordered_set<uint64_t> addrs;
-         for (unsigned i=1; i<words.size(); i++){ 
-            uint64_t addr = stoi(words[i], 0, 16);
-            addrs.insert(addr);
+         std::unordered_map<uint64_t, long> addrAndPrefDist;
+         if (words.size()%2==0){
+            llvm::outs()<<"[InjectPrefetchPass] Error: The format of the prefetch-loc-file is wrong\n";
+            exit(1);
          }
-         locations.insert(make_pair(words[0], addrs));
+         for (unsigned i=1; i<words.size(); i=i+2){ 
+            uint64_t addr = stoi(words[i], 0, 16);
+            long pref_dist = stoi(words[i+1],0, 10);
+            addrAndPrefDist.insert(std::make_pair(addr, pref_dist));
+         }
+         locations.insert(std::make_pair(words[0], addrAndPrefDist));
          llvm::outs() << line << "\n"; 
       }
         
