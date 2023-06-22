@@ -317,6 +317,7 @@ bool InjectPrefetchPass::runOnFunction(BinaryFunction &BF) {
       MCInst BoundsCheckBranch;
       BC.MIB->createJZ(BoundsCheckBranch, HeaderBB->getLabel()  , BC.Ctx.get());
       TopLLCMissInfos[i].BoundsCheckBB->addInstruction(BoundsCheckBranch);
+      TopLLCMissInfos[i].PrefetchBB->addBranchInstruction(HeaderBB);  
     }
     else{
       TopLLCMissInfos[i].BoundsCheckBB->addSuccessor(TopLLCMissInfos[i+1].BoundsCheckBB);
@@ -324,6 +325,7 @@ bool InjectPrefetchPass::runOnFunction(BinaryFunction &BF) {
       MCInst BoundsCheckBranch;
       BC.MIB->createJZ(BoundsCheckBranch, TopLLCMissInfos[i+1].BoundsCheckBB->getLabel()  , BC.Ctx.get());
       TopLLCMissInfos[i].BoundsCheckBB->addInstruction(BoundsCheckBranch);
+      TopLLCMissInfos[i].PrefetchBB->addBranchInstruction(TopLLCMissInfos[i+1].BoundsCheckBB);  
     }
   }
 
