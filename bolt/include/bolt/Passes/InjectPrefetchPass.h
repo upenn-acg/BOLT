@@ -23,7 +23,8 @@ private:
     BinaryLoop* OuterLoop;
     std::vector<MCInst*> predLoadInstrs;
     MCInst DemandLoadInstr;  // the second element of predLoadInstrs
-    MCPhysReg freeReg;
+    BinaryBasicBlock* BoundsCheckBB;
+    BinaryBasicBlock* PrefetchBB;
   } TopLLCMissInfo;
 
 public:
@@ -42,12 +43,20 @@ public:
                                                         MCInst*, BinaryBasicBlock*);
   BinaryLoop* getOuterLoopForBB( BinaryFunction&, 
                                  BinaryBasicBlock*);
+  BinaryBasicBlock* createBoundsCheckBB0(BinaryFunction&, BinaryBasicBlock*,
+                                        MCInst*, MCInst*, int prefetchDist,
+                                        MCPhysReg);
   BinaryBasicBlock* createBoundsCheckBB(BinaryFunction&, BinaryBasicBlock*,
-                                        MCInst*, MCInst*, MCInst, int prefetchDist,
-                                        std::vector<TopLLCMissInfo>);
+                                        BinaryBasicBlock*, MCInst*, MCInst*, 
+                                        int prefetchDist, MCPhysReg);
   BinaryBasicBlock* createPrefetchBB(BinaryFunction&, BinaryBasicBlock*,
-                                     BinaryBasicBlock*, int prefetchDist, 
-                                     std::vector<TopLLCMissInfo>);
+                                     std::vector<MCInst*>, int prefetchDist, 
+                                     MCPhysReg);
+  BinaryBasicBlock* createPrefetchBB1(BinaryFunction&, BinaryBasicBlock*,
+                                      BinaryBasicBlock*, std::vector<MCInst*>,
+                                      int prefetchDist, 
+                                      MCPhysReg);
+
 };
 
 } // namespace bolt
