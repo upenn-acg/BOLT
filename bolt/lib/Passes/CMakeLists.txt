@@ -46,7 +46,6 @@ add_llvm_library(LLVMBOLTPasses
   RetpolineInsertion.cpp
   InjectPrefetchPass.cpp
   InjectPrefetchLitePass.cpp
-  InjectPrefetchSuperLitePass.cpp
   InjectPrefetchInnerLoop.cpp
 
   LINK_LIBS

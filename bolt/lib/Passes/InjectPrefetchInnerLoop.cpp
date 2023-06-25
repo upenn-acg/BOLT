@@ -206,15 +206,24 @@ bool InjectPrefetchInnerLoop::runOnFunction(BinaryFunction &BF) {
 //    PrefetchBB->addBranchInstruction(HeaderBB);
  
     for (unsigned i=0; i<PredsOfHeaderBB.size(); i++){
-      MCInst* LastBranch = PredsOfHeaderBB[i]->getLastNonPseudoInstr();
-      if (BC.MIB->isBranch(*LastBranch)){
+      //MCInst* LastBranch = PredsOfHeaderBB[i]->getLastNonPseudoInstr();
+      
+      MCInst* LastBranch = NULL;
+      for (auto it = PredsOfHeaderBB[i]->begin(); it != PredsOfHeaderBB[i]->end(); it++){
+        if (BC.MIB->isBranch(*it)){
+           LastBranch = &(*it);
+           break;
+        } 
+      }
+      
+      if ((LastBranch) && (BC.MIB->isBranch(*LastBranch))){
         const MCExpr* LastBranchTargetExpr = LastBranch->getOperand(0).getExpr();
         const MCSymbol* LastBranchTargetSymbol = BC.MIB->getTargetSymbol(LastBranchTargetExpr);
         if (LastBranchTargetSymbol==HeaderBB->getLabel()){
           BC.MIB->replaceBranchTarget(*LastBranch, BoundsCheckBB->getLabel(), BC.Ctx.get());
         }
         else{
-//           PredsOfHeaderBB[i]->addBranchInstruction(BoundsCheckBB);
+      //    PredsOfHeaderBB[i]->addBranchInstruction(BoundsCheckBB);
         }
       }
     } 
