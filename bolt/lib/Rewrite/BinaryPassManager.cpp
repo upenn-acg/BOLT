@@ -483,9 +483,9 @@ void BinaryFunctionPassManager::runAllPasses(BinaryContext &BC) {
 
   Manager.registerPass(std::make_unique<LowerAnnotations>(NeverPrint));
 */
-//  Manager.registerPass(std::make_unique<InjectPrefetchPass>());
+  Manager.registerPass(std::make_unique<InjectPrefetchPass>());
 //  Manager.registerPass(std::make_unique<InjectPrefetchLitePass>());
-  Manager.registerPass(std::make_unique<InjectPrefetchInnerLoop>());
+//  Manager.registerPass(std::make_unique<InjectPrefetchInnerLoop>());
 
 
 
