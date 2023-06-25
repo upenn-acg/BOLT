@@ -21,6 +21,7 @@ private:
     BinaryBasicBlock* TopLLCMissBB;
     MCInst* TopLLCMissInstr;
     BinaryLoop* OuterLoop;
+    BinaryLoop* InnerLoop;
     std::vector<MCInst*> predLoadInstrs;
     MCInst DemandLoadInstr;  // the second element of predLoadInstrs
     BinaryBasicBlock* BoundsCheckBB;
@@ -42,8 +43,8 @@ public:
   bool runOnFunction(BinaryFunction &Function);
   std::pair<MCInst*, BinaryBasicBlock*> findDemandLoad( BinaryFunction&, BinaryLoop*, 
                                                         MCInst*, BinaryBasicBlock*);
-  BinaryLoop* getOuterLoopForBB( BinaryFunction&, 
-                                 BinaryBasicBlock*);
+  BinaryLoop* getOuterLoopForBB( BinaryFunction&, BinaryBasicBlock*);
+  BinaryLoop* getInnerLoopForBB( BinaryFunction&, BinaryBasicBlock*);
   BinaryBasicBlock* createBoundsCheckBB0(BinaryFunction&, BinaryBasicBlock*,
                                         MCInst*, MCInst*, int prefetchDist,
                                         MCPhysReg);

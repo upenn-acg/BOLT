@@ -47,6 +47,7 @@ add_llvm_library(LLVMBOLTPasses
   InjectPrefetchPass.cpp
   InjectPrefetchLitePass.cpp
   InjectPrefetchSuperLitePass.cpp
+  InjectPrefetchInnerLoop.cpp
 
   LINK_LIBS
   ${LLVM_PTHREAD_LIB}

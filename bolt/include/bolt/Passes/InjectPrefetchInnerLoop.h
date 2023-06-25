@@ -6,15 +6,15 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef BOLT_PASSES_INJECTPREFETCHSUPERLITE_H
-#define BOLT_PASSES_INJECTPREFETCHSUPERLITE_H
+#ifndef BOLT_PASSES_INJECTPREFETCHINNERLOOP_H
+#define BOLT_PASSES_INJECTPREFETCHINNERLOOP_H
 
 #include "bolt/Passes/BinaryPasses.h"
 
 namespace llvm {
 namespace bolt {
 
-class InjectPrefetchSuperLitePass : public BinaryFunctionPass {
+class InjectPrefetchInnerLoop : public BinaryFunctionPass {
 private:
   std::unordered_map<std::string, std::unordered_map<uint64_t,long>> TopLLCMissLocations;
   typedef struct TopLLCMissInfo{
@@ -29,7 +29,7 @@ private:
   } TopLLCMissInfo;
 
 public:
-  explicit InjectPrefetchSuperLitePass() : BinaryFunctionPass(false) {}
+  explicit InjectPrefetchInnerLoop() : BinaryFunctionPass(false) {}
 
   const char *getName() const override { return "inject-prefetch"; }
   /// Helper functions

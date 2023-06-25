@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "bolt/Passes/InjectPrefetchSuperLitePass.h"
+#include "bolt/Passes/InjectPrefetchInnerLoop.h"
 #include "bolt/Core/ParallelUtilities.h"
 #include <unordered_map>
 #include <fstream>
@@ -33,7 +33,7 @@ extern cl::opt<std::string> PrefetchLocationFile;
 namespace llvm {
 namespace bolt {
 
-bool InjectPrefetchSuperLitePass::runOnFunction(BinaryFunction &BF) {
+bool InjectPrefetchInnerLoop::runOnFunction(BinaryFunction &BF) {
 
   BinaryContext& BC = BF.getBinaryContext();
   uint64_t startingAddr = BF.getAddress();
@@ -42,9 +42,9 @@ bool InjectPrefetchSuperLitePass::runOnFunction(BinaryFunction &BF) {
   std::unordered_map<uint64_t, long> TopLLCMissAddrs = TopLLCMissLocations[demangledFuncName];
   uint64_t TopLLCMissAddr = TopLLCMissAddrs.begin()->second;
 
-  llvm::outs()<<"[InjectPrefetchSuperLitePass] The starting address of "<<demangledFuncName<<" is: 0x"
+  llvm::outs()<<"[InjectPrefetchInnerLoop] The starting address of "<<demangledFuncName<<" is: 0x"
               <<utohexstr(startingAddr)<<"\n";
-  llvm::outs()<<"[InjectPrefetchSuperLitePass] The top llc miss addr is: 0x"
+  llvm::outs()<<"[InjectPrefetchInnerLoop] The top llc miss addr is: 0x"
               <<utohexstr(TopLLCMissAddr)<<"\n";
 
   std::vector<BinaryBasicBlock*> TopLLCMissBBs;
@@ -58,15 +58,15 @@ bool InjectPrefetchSuperLitePass::runOnFunction(BinaryFunction &BF) {
       if (BC.MIB->hasAnnotation(Instr, "AbsoluteAddr")){
         uint64_t AbsoluteAddr = (uint64_t)BC.MIB->getAnnotationAs<uint64_t>(Instr, "AbsoluteAddr");        
         if ( TopLLCMissAddrs.find(AbsoluteAddr) != TopLLCMissAddrs.end() ){
-          llvm::outs()<<"[InjectPrefetchSuperLitePass] find instruction that causes the TOP LLC miss\n";
+          llvm::outs()<<"[InjectPrefetchInnerLoop] find instruction that causes the TOP LLC miss\n";
           if (BC.MIB->isLoad(Instr)){
-            llvm::outs()<<"[InjectPrefetchSuperLitePass] TOP LLC miss instruction is a load\n";         
+            llvm::outs()<<"[InjectPrefetchInnerLoop] TOP LLC miss instruction is a load\n";         
           }
           else if (BC.MIB->isStore(Instr)){
-            llvm::outs()<<"[InjectPrefetchSuperLitePass] TOP LLC miss instruction is a store\n";
+            llvm::outs()<<"[InjectPrefetchInnerLoop] TOP LLC miss instruction is a store\n";
           }
           else {
-            llvm::outs()<<"[InjectPrefetchSuperLitePass] This pass only inject prefetch for load or store instruction\n";
+            llvm::outs()<<"[InjectPrefetchInnerLoop] This pass only inject prefetch for load or store instruction\n";
             return false;
           }
           TopLLCMissBBs.push_back(&BB);
@@ -96,15 +96,15 @@ bool InjectPrefetchSuperLitePass::runOnFunction(BinaryFunction &BF) {
           if (BC.MIB->hasAnnotation(Instr, "AbsoluteAddr")){
             uint64_t AbsoluteAddr = (uint64_t)BC.MIB->getAnnotationAs<uint64_t>(Instr, "AbsoluteAddr");        
             if ( TopLLCMissAddrs.find(AbsoluteAddr) != TopLLCMissAddrs.end() ){
-              llvm::outs()<<"[InjectPrefetchSuperLitePass] find instruction that causes the TOP LLC miss\n";
+              llvm::outs()<<"[InjectPrefetchInnerLoop] find instruction that causes the TOP LLC miss\n";
               if (BC.MIB->isLoad(Instr)){
-                llvm::outs()<<"[InjectPrefetchSuperLitePass] TOP LLC miss instruction is a load\n";         
+                llvm::outs()<<"[InjectPrefetchInnerLoop] TOP LLC miss instruction is a load\n";         
               }
               else if (BC.MIB->isStore(Instr)){
-                llvm::outs()<<"[InjectPrefetchSuperLitePass] TOP LLC miss instruction is a store\n";
+                llvm::outs()<<"[InjectPrefetchInnerLoop] TOP LLC miss instruction is a store\n";
               }
               else {
-                llvm::outs()<<"[InjectPrefetchSuperLitePass] This pass only inject prefetch for load or store instruction\n";
+                llvm::outs()<<"[InjectPrefetchInnerLoop] This pass only inject prefetch for load or store instruction\n";
                 return false;
               }
               TopLLCMissBBs.push_back(&BB);
@@ -133,7 +133,7 @@ bool InjectPrefetchSuperLitePass::runOnFunction(BinaryFunction &BF) {
       }
     }
     if (!BBcontainsLoop){
-      llvm::outs()<<"[InjectPrefetchSuperLitePass] TopLLCMissBB is not a loop\n";
+      llvm::outs()<<"[InjectPrefetchInnerLoop] TopLLCMissBB is not a loop\n";
       return false;
     }
   
@@ -143,7 +143,7 @@ bool InjectPrefetchSuperLitePass::runOnFunction(BinaryFunction &BF) {
     TopLLCMissInfos[i].InnerLoop = getInnerLoopForBB (BF, TopLLCMissBB);
 
     if (TopLLCMissInfos[i].InnerLoop == NULL){
-      llvm::outs()<<"[InjectPrefetchSuperLitePass] The inner loop that contains top LLC miss BB doesn't exist\n";
+      llvm::outs()<<"[InjectPrefetchInnerLoop] The inner loop that contains top LLC miss BB doesn't exist\n";
       return false;
     }
 
@@ -249,7 +249,7 @@ bool InjectPrefetchSuperLitePass::runOnFunction(BinaryFunction &BF) {
 
 
 
-BinaryLoop* InjectPrefetchSuperLitePass::getInnerLoopForBB( BinaryFunction& BF,
+BinaryLoop* InjectPrefetchInnerLoop::getInnerLoopForBB( BinaryFunction& BF,
                                                             BinaryBasicBlock* TopLLCMissBB){
 
   // get loop info of this function
@@ -295,7 +295,7 @@ BinaryLoop* InjectPrefetchSuperLitePass::getInnerLoopForBB( BinaryFunction& BF,
   // if the top LLC miss instruction doesn't exist in 
   // a nested loop, we are not going to inject prefetch
   if (LoopDepth < 1) {
-    llvm::outs()<<"[InjectPrefetchSuperLitePass] The inner loop that contains top LLC miss BB doesn't exist\n";
+    llvm::outs()<<"[InjectPrefetchInnerLoop] The inner loop that contains top LLC miss BB doesn't exist\n";
     return NULL;
   }
 
@@ -311,7 +311,7 @@ BinaryLoop* InjectPrefetchSuperLitePass::getInnerLoopForBB( BinaryFunction& BF,
 
 
 
-BinaryLoop* InjectPrefetchSuperLitePass::getOuterLoopForBB( BinaryFunction& BF,
+BinaryLoop* InjectPrefetchInnerLoop::getOuterLoopForBB( BinaryFunction& BF,
                                                             BinaryBasicBlock* TopLLCMissBB){
   // get loop info of this function
   BF.updateLayoutIndices();
@@ -356,7 +356,7 @@ BinaryLoop* InjectPrefetchSuperLitePass::getOuterLoopForBB( BinaryFunction& BF,
   // if the top LLC miss instruction doesn't exist in 
   // a nested loop, we are not going to inject prefetch
   if (LoopDepth < 2) {
-    llvm::outs()<<"[InjectPrefetchSuperLitePass] The outer loop that contains top LLC miss BB doesn't exist\n";
+    llvm::outs()<<"[InjectPrefetchInnerLoop] The outer loop that contains top LLC miss BB doesn't exist\n";
     return NULL;
   }
 
@@ -370,7 +370,7 @@ BinaryLoop* InjectPrefetchSuperLitePass::getOuterLoopForBB( BinaryFunction& BF,
 
 
 
-std::pair<MCInst*, BinaryBasicBlock*> InjectPrefetchSuperLitePass::findDemandLoad(BinaryFunction& BF,
+std::pair<MCInst*, BinaryBasicBlock*> InjectPrefetchInnerLoop::findDemandLoad(BinaryFunction& BF,
                                                                                   BinaryLoop* OuterLoop, 
                                                                                   MCInst* DstLoad, 
                                                                                   BinaryBasicBlock* DstLoadBB){
@@ -476,7 +476,7 @@ std::pair<MCInst*, BinaryBasicBlock*> InjectPrefetchSuperLitePass::findDemandLoa
 
 
 
-std::vector<MCInst*> InjectPrefetchSuperLitePass::getPredInstrs ( BinaryFunction& BF,
+std::vector<MCInst*> InjectPrefetchInnerLoop::getPredInstrs ( BinaryFunction& BF,
                                                                   BinaryBasicBlock* TopLLCMissBB,
                                                                   MCInst* LoopInductionInstr,
                                                                   MCInst* TopLLCMissInstrP){ 
@@ -520,7 +520,7 @@ std::vector<MCInst*> InjectPrefetchSuperLitePass::getPredInstrs ( BinaryFunction
 }
 
 
-std::unordered_map<MCPhysReg, MCPhysReg> InjectPrefetchSuperLitePass::getDstRegMapTable ( BinaryFunction& BF,
+std::unordered_map<MCPhysReg, MCPhysReg> InjectPrefetchInnerLoop::getDstRegMapTable ( BinaryFunction& BF,
                                                                                           std::vector<MCInst*> predInstrs,
                                                                                           MCInst* TopLLCMissInstrP){
   BinaryContext& BC = BF.getBinaryContext();
@@ -582,7 +582,7 @@ std::unordered_map<MCPhysReg, MCPhysReg> InjectPrefetchSuperLitePass::getDstRegM
 
 
 
-std::vector<MCInst> InjectPrefetchSuperLitePass::getPredInstrsForPrefetch ( BinaryFunction& BF,
+std::vector<MCInst> InjectPrefetchInnerLoop::getPredInstrsForPrefetch ( BinaryFunction& BF,
                                                                             MCInst* LoopInductionInstr,
                                                                             MCInst* TopLLCMissInstrP,
                                                                             std::vector<MCInst*> predInstrs,
@@ -636,7 +636,7 @@ std::vector<MCInst> InjectPrefetchSuperLitePass::getPredInstrsForPrefetch ( Bina
 
 
 
-BinaryBasicBlock* InjectPrefetchSuperLitePass::createBoundsCheckBB(BinaryFunction& BF,
+BinaryBasicBlock* InjectPrefetchInnerLoop::createBoundsCheckBB(BinaryFunction& BF,
                                                                    BinaryBasicBlock* HeaderBB,
                                                                    MCInst* LoopGuardCMPInstr,
                                                                    MCInst* LoopInductionInstr,
@@ -753,7 +753,7 @@ BinaryBasicBlock* InjectPrefetchSuperLitePass::createBoundsCheckBB(BinaryFunctio
 
 
 
-BinaryBasicBlock* InjectPrefetchSuperLitePass::createPrefetchBB(BinaryFunction& BF,
+BinaryBasicBlock* InjectPrefetchInnerLoop::createPrefetchBB(BinaryFunction& BF,
                                                                 BinaryBasicBlock* HeaderBB,
                                                                 BinaryBasicBlock* BoundsCheckBB,
                                                                 MCInst* TopLLCMissInstrP,
@@ -827,7 +827,7 @@ BinaryBasicBlock* InjectPrefetchSuperLitePass::createPrefetchBB(BinaryFunction& 
       BC.MIB->createPrefetchT0Expr(PrefetchInst, TopLLCMissInstrP->getOperand(1).getReg(), TopLLCMissInstrP->getOperand(4).getExpr(), freeReg, TopLLCMissInstrP->getOperand(2).getImm(), BC.MIB->getNoRegister(), tmp);
     }
     else{
-      llvm::outs()<<"[InjectPrefetchLitePass] TopLLCMiss instr must contain loop induction var\n";
+      llvm::outs()<<"[InjectPrefetchLite] TopLLCMiss instr must contain loop induction var\n";
       exit(1);
     }
 
@@ -850,7 +850,7 @@ BinaryBasicBlock* InjectPrefetchSuperLitePass::createPrefetchBB(BinaryFunction& 
 
 
 
-std::vector<std::string> InjectPrefetchSuperLitePass::splitLine(std::string str){
+std::vector<std::string> InjectPrefetchInnerLoop::splitLine(std::string str){
    std::vector<std::string> words;
    std::stringstream ss(str);
    std::string tmp;
@@ -864,38 +864,8 @@ std::vector<std::string> InjectPrefetchSuperLitePass::splitLine(std::string str)
 
 
 
-/*
-std::unordered_map<std::string, std::unordered_set<uint64_t>> InjectPrefetchSuperLitePass::getTopLLCMissLocationFromFile(){
-   std::unordered_map<std::string, std::unordered_set<uint64_t>> locations;
 
-   std::string FileName = opts::PrefetchLocationFile; 
-   std::fstream f;
-   f.open(FileName, std::ios::in); 
-    
-   if (f.is_open()) { 
-      std::string line;
-      while (getline(f, line)) { 
-         std::vector<std::string> words = splitLine(line);
-         std::unordered_set<uint64_t> addrs;
-         for (unsigned i=1; i<words.size(); i++){ 
-            uint64_t addr = stoi(words[i], 0, 16);
-            addrs.insert(addr);
-         }
-         locations.insert(make_pair(words[0], addrs));
-         llvm::outs() << line << "\n"; 
-      }
-        
-      // Close the file object.
-      f.close(); 
-   }
-   return locations;
-}
-*/
-
-
-
-
-std::unordered_map<std::string, std::unordered_map<uint64_t, long>> InjectPrefetchSuperLitePass::getTopLLCMissLocationFromFile(){
+std::unordered_map<std::string, std::unordered_map<uint64_t, long>> InjectPrefetchInnerLoop::getTopLLCMissLocationFromFile(){
    std::unordered_map<std::string, std::unordered_map<uint64_t, long>> locations;
 
    std::string FileName = opts::PrefetchLocationFile; 
@@ -931,7 +901,7 @@ std::unordered_map<std::string, std::unordered_map<uint64_t, long>> InjectPrefet
 
 
 
-std::string InjectPrefetchSuperLitePass::removeSuffix(std::string FuncName){
+std::string InjectPrefetchInnerLoop::removeSuffix(std::string FuncName){
    return FuncName.substr(0, FuncName.find("("));
 }
 
@@ -939,7 +909,7 @@ std::string InjectPrefetchSuperLitePass::removeSuffix(std::string FuncName){
 
 
 
-void InjectPrefetchSuperLitePass::runOnFunctions(BinaryContext &BC) {
+void InjectPrefetchInnerLoop::runOnFunctions(BinaryContext &BC) {
    if (!opts::InjectPrefetch) return;
    if (opts::PrefetchLocationFile.empty()) return;
    TopLLCMissLocations 
