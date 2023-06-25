@@ -33,7 +33,6 @@
 #include "bolt/Passes/VeneerElimination.h"
 #include "bolt/Passes/InjectPrefetchPass.h"
 #include "bolt/Passes/InjectPrefetchLitePass.h"
-#include "bolt/Passes/InjectPrefetchSuperLitePass.h"
 #include "bolt/Passes/InjectPrefetchInnerLoop.h"
 #include "bolt/Utils/CommandLineOpts.h"
 #include "llvm/Support/FormatVariadic.h"
