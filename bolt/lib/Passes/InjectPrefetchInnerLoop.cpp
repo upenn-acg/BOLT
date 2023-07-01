@@ -646,12 +646,12 @@ std::vector<MCInst> InjectPrefetchInnerLoop::getPredInstrsForPrefetch ( BinaryFu
 
 
 BinaryBasicBlock* InjectPrefetchInnerLoop::createBoundsCheckBB(BinaryFunction& BF,
-                                                                   BinaryBasicBlock* HeaderBB,
-                                                                   MCInst* LoopGuardCMPInstr,
-                                                                   MCInst* LoopInductionInstr,
-                                                                   std::vector<MCInst*> predInstrs,
-                                                                   std::unordered_map<MCPhysReg, MCPhysReg> dstRegMapTable,
-                                                                   int prefetchDist){
+                                                               BinaryBasicBlock* HeaderBB,
+                                                               MCInst* LoopGuardCMPInstr,
+                                                               MCInst* LoopInductionInstr,
+                                                               std::vector<MCInst*> predInstrs,
+                                                               std::unordered_map<MCPhysReg, MCPhysReg> dstRegMapTable,
+                                                               int prefetchDist){
   BinaryContext& BC = BF.getBinaryContext();
   // before we change the CFG of this function to add the 
   // BoundCHeckBB and PrefetchBB, we need to save all the 
@@ -763,13 +763,13 @@ BinaryBasicBlock* InjectPrefetchInnerLoop::createBoundsCheckBB(BinaryFunction& B
 
 
 BinaryBasicBlock* InjectPrefetchInnerLoop::createPrefetchBB(BinaryFunction& BF,
-                                                                BinaryBasicBlock* HeaderBB,
-                                                                BinaryBasicBlock* BoundsCheckBB,
-                                                                MCInst* TopLLCMissInstrP,
-                                                                MCInst* LoopInductionInstr,
-                                                                std::unordered_map<MCPhysReg, MCPhysReg> dstRegMapTable,
-                                                                int prefetchDist,
-                                                                std::vector<MCInst> predInstrsForPrefetch){
+                                                            BinaryBasicBlock* HeaderBB,
+                                                            BinaryBasicBlock* BoundsCheckBB,
+                                                            MCInst* TopLLCMissInstrP,
+                                                            MCInst* LoopInductionInstr,
+                                                            std::unordered_map<MCPhysReg, MCPhysReg> dstRegMapTable,
+                                                            int prefetchDist,
+                                                            std::vector<MCInst> predInstrsForPrefetch){
 
   BinaryContext& BC = BF.getBinaryContext();
   // create prefetchBB
@@ -810,7 +810,7 @@ BinaryBasicBlock* InjectPrefetchInnerLoop::createPrefetchBB(BinaryFunction& BF,
         TopLLCMissInstrNew.addOperand(TopLLCMissInstr.getOperand(j));
       }
     }
-
+    llvm::outs()<<"#### "<<predInstrsForPrefetch.size()<<" "<<predInstrsForPrefetch.size()+3<<"\n";
     MCInst PrefetchInst;
     MCInst LoadPrefetchAddrInstr;
     BC.MIB->createPrefetchT0(PrefetchInst, TopLLCMissInstrNew.getOperand(0).getReg(), 0, TopLLCMissInstrNew.getOperand(2).getReg(), TopLLCMissInstrNew.getOperand(1).getImm(), BC.MIB->getNoRegister(), LoadPrefetchAddrInstr); 
@@ -826,6 +826,8 @@ BinaryBasicBlock* InjectPrefetchInnerLoop::createPrefetchBB(BinaryFunction& BF,
       BC.MIB->createLEA64r(Lea64rInstr, TopLLCMissInstrP->getOperand(3).getReg(), 1, BC.MIB->getNoRegister(), prefetchDist, BC.MIB->getNoRegister(), freeReg );
     }
     PrefetchBBs.back()->addInstruction(Lea64rInstr);
+
+    llvm::outs()<<"#### 1 4\n";
 
     MCInst PrefetchInst;
     MCInst tmp;

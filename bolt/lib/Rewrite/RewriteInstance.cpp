@@ -4487,7 +4487,12 @@ void RewriteInstance::updateELFSymbolTable(
         sprintf(orig, "%lx", Function->getAddress());
         sprintf(bolt, "%lx", Function->getOutputAddress());
         outs()<<"@@@@ "<<*Function;
-        outs()<<" "<<orig<<" "<<bolt<<" "<<Function->getSize()<<" "<<Function->getOutputSize()<<"\n";
+        outs()<<" "<<orig<<" "<<bolt<<" "<<Function->getSize()<<" "<<Function->getOutputSize();
+        std::vector<std::pair<int,int>> prefetchLocs = Function->getPrefetchLocations();
+        for (auto pair: prefetchLocs){
+          outs()<<" "<<pair.first<<" "<<pair.second;
+        }
+        outs()<<"\n";
       } else if (Symbol.st_shndx < ELF::SHN_LORESERVE) {
         NewSymbol.st_shndx = getNewSectionIndex(Symbol.st_shndx);
       }

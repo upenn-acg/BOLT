@@ -643,7 +643,7 @@ BinaryBasicBlock* InjectPrefetchPass::createBoundsCheckBB(BinaryFunction& BF,
   // add 0x20, %rax
   // cmp 0x18(%rsp), rax
   // jz 0xa1(%rip)
-  MCSymbol *BoundsCheckLabel = BC.Ctx->createNamedTempSymbol("BoundaryCheckBB");
+  MCSymbol *BoundsCheckLabel = BC.Ctx->createNamedTempSymbol("BoundsCheckBB");
 
   std::vector<std::unique_ptr<BinaryBasicBlock>> BoundCheckBBs;
   BoundCheckBBs.emplace_back(BF.createBasicBlock(BinaryBasicBlock::INVALID_OFFSET, BoundsCheckLabel));
@@ -788,6 +788,11 @@ BinaryBasicBlock* InjectPrefetchPass::createPrefetchBB(BinaryFunction& BF,
   }
   PrefetchBBs.back()->addInstruction(LoadPrefetchAddrInstr);
 
+  std::vector<std::pair<int, int>> prefetchLoc;
+  prefetchLoc.push_back(std::make_pair(1, predLoadInstrs.size()+2));
+  BF.setPrefetchLocations(prefetchLoc);
+  llvm::outs()<<"#### 1 "<<predLoadInstrs.size()+2<<"\n";
+
   // add prefetch instruction
   // prefetcht0 (%rax) 
   MCInst PrefetchInst;
@@ -872,6 +877,12 @@ BinaryBasicBlock* InjectPrefetchPass::createPrefetchBB1(BinaryFunction& BF,
     }
   }
   PrefetchBBs.back()->addInstruction(LoadPrefetchAddrInstr);
+
+
+  std::vector<std::pair<int, int>> prefetchLoc;
+  prefetchLoc.push_back(std::make_pair(1, predLoadInstrs.size()+2));
+  BF.setPrefetchLocations(prefetchLoc);
+  llvm::outs()<<"#### 1 "<<predLoadInstrs.size()+2<<"\n";
 
   // add prefetch instruction
   // prefetcht0 (%rax) 

@@ -215,6 +215,8 @@ private:
   /// Containing section in the input file.
   BinarySection *OriginSection = nullptr;
 
+
+  std::vector<std::pair<int, int>> prefetchLocations;
   /// Address of the function in memory. Also could be an offset from
   /// base address for position independent binaries.
   uint64_t Address;
@@ -1958,6 +1960,19 @@ public:
 
   void setOutputColdDataAddress(uint64_t Address) {
     OutputColdDataOffset = Address;
+  }
+
+  void setPrefetchLocations(std::vector<std::pair<int, int>> prefetchLoc){
+    if (prefetchLocations.empty()){
+      prefetchLocations = prefetchLoc;
+    }
+    else{
+      prefetchLocations.insert(prefetchLocations.end(), prefetchLoc.begin(), prefetchLoc.end() ); 
+    }
+  }
+
+  std::vector<std::pair<int, int>> getPrefetchLocations() const{
+    return prefetchLocations;
   }
 
   uint64_t getOutputColdDataAddress() const { return OutputColdDataOffset; }
