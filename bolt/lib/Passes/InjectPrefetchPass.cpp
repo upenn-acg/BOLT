@@ -24,7 +24,7 @@ using namespace llvm;
 namespace opts {
 
 extern cl::OptionCategory BoltCategory;
-
+extern cl::opt<bool> TestPrefetchable;
 extern cl::opt<bool> InjectPrefetch;
 extern cl::opt<std::string> PrefetchLocationFile;
 //extern cl::opt<unsigned> PrefetchDistance;
@@ -34,6 +34,7 @@ namespace llvm {
 namespace bolt {
 
 bool InjectPrefetchPass::runOnFunction(BinaryFunction &BF) {
+  if (opts::TestPrefetchable) return false;
 
   BinaryContext& BC = BF.getBinaryContext();
   uint64_t startingAddr = BF.getAddress();
@@ -239,7 +240,9 @@ bool InjectPrefetchPass::runOnFunction(BinaryFunction &BF) {
   SmallVector<BinaryBasicBlock*, 0> PredsOfHeaderBB = HeaderBB->getPredecessors();
 
   for (unsigned i=0; i<TopLLCMissInfos.size(); i++){
-    
+    if ((TopLLCMissInfos[i].OuterLoop == NULL) ||
+       (TopLLCMissInfos[i].OuterLoop != OuterLoop))   
+      continue; 
     if (i==0){
       TopLLCMissInfos[i].BoundsCheckBB = createBoundsCheckBB0(BF, HeaderBB, 
                                                               LoopGuardCMPInstr,
