@@ -729,10 +729,10 @@ BinaryBasicBlock* InjectPrefetchPass::createBoundsCheckBB(BinaryFunction& BF,
 
 
 BinaryBasicBlock* InjectPrefetchPass::createPrefetchBB(BinaryFunction& BF,
-                                      BinaryBasicBlock* BoundsCheckBB,
-                                      std::vector<MCInst*> predLoadInstrs,
-                                      int prefetchDist,
-                                      MCPhysReg freeReg){
+                                                       BinaryBasicBlock* BoundsCheckBB,
+                                                       std::vector<MCInst*> predLoadInstrs,
+                                                       int prefetchDist,
+                                                       MCPhysReg freeReg){
 
   BinaryContext& BC = BF.getBinaryContext();
   
@@ -885,6 +885,7 @@ BinaryBasicBlock* InjectPrefetchPass::createPrefetchBB1(BinaryFunction& BF,
   std::vector<std::pair<int, int>> prefetchLoc;
   prefetchLoc.push_back(std::make_pair(1, predLoadInstrs.size()+2));
   BF.setPrefetchLocations(prefetchLoc);
+  BF.setPrefetchScale(8);
   llvm::outs()<<"#### 1 "<<predLoadInstrs.size()+2<<"\n";
 
   // add prefetch instruction

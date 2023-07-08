@@ -242,6 +242,7 @@ private:
   /// Maximum number of bytes used for alignment of hot part of the function.
   uint16_t MaxAlignmentBytes{0};
 
+  int prefetchScale;
   /// Maximum number of bytes used for alignment of cold part of the function.
   uint16_t MaxColdAlignmentBytes{0};
 
@@ -1969,6 +1970,14 @@ public:
     else{
       prefetchLocations.insert(prefetchLocations.end(), prefetchLoc.begin(), prefetchLoc.end() ); 
     }
+  }
+
+  void setPrefetchScale(int scale){
+    prefetchScale = scale;
+  }
+
+  int getPrefetchScale() const{
+    return prefetchScale;
   }
 
   std::vector<std::pair<int, int>> getPrefetchLocations() const{

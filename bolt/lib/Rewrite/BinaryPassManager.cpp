@@ -35,6 +35,7 @@
 #include "bolt/Passes/InjectPrefetchLitePass.h"
 #include "bolt/Passes/InjectPrefetchInnerLoop.h"
 #include "bolt/Passes/Prefetchable.h"
+#include "bolt/Passes/PrefetchableInnerLoop.h"
 #include "bolt/Utils/CommandLineOpts.h"
 #include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/Timer.h"
@@ -483,10 +484,11 @@ void BinaryFunctionPassManager::runAllPasses(BinaryContext &BC) {
 
   Manager.registerPass(std::make_unique<LowerAnnotations>(NeverPrint));
 */
-  Manager.registerPass(std::make_unique<InjectPrefetchPass>());
+//  Manager.registerPass(std::make_unique<InjectPrefetchPass>());
 //  Manager.registerPass(std::make_unique<InjectPrefetchLitePass>());
-//  Manager.registerPass(std::make_unique<InjectPrefetchInnerLoop>());
-  Manager.registerPass(std::make_unique<Prefetchable>());
+  Manager.registerPass(std::make_unique<InjectPrefetchInnerLoop>());
+//  Manager.registerPass(std::make_unique<Prefetchable>());
+  Manager.registerPass(std::make_unique<PrefetchableInnerLoop>());
 
 
 

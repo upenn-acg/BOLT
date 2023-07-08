@@ -182,8 +182,8 @@ bool InjectPrefetchInnerLoop::runOnFunction(BinaryFunction &BF) {
  
     std::unordered_map<MCPhysReg, MCPhysReg> dstRegMapTable = getDstRegMapTable(BF,predInstrs, TopLLCMissInstrP);
 
-    llvm::outs()<<"@@@@@@@ predInstrs.size()="<<predInstrs.size()<<"\n";
-    llvm::outs()<<"@@@@@@@ dstRegMapTable.size()="<<dstRegMapTable.size()<<"\n";
+//    llvm::outs()<<"@@@@@@@ predInstrs.size()="<<predInstrs.size()<<"\n";
+//    llvm::outs()<<"@@@@@@@ dstRegMapTable.size()="<<dstRegMapTable.size()<<"\n";
 
     std::vector<MCInst> predInstrsForPrefetch = getPredInstrsForPrefetch ( BF, LoopInductionInstr, TopLLCMissInstrP,
                                                                            predInstrs, dstRegMapTable,
@@ -592,11 +592,11 @@ std::unordered_map<MCPhysReg, MCPhysReg> InjectPrefetchInnerLoop::getDstRegMapTa
 
 
 std::vector<MCInst> InjectPrefetchInnerLoop::getPredInstrsForPrefetch ( BinaryFunction& BF,
-                                                                            MCInst* LoopInductionInstr,
-                                                                            MCInst* TopLLCMissInstrP,
-                                                                            std::vector<MCInst*> predInstrs,
-                                                                            std::unordered_map<MCPhysReg, MCPhysReg> dstRegMapTable,
-                                                                            int prefetchDist  ){
+                                                                        MCInst* LoopInductionInstr,
+                                                                        MCInst* TopLLCMissInstrP,
+                                                                        std::vector<MCInst*> predInstrs,
+                                                                        std::unordered_map<MCPhysReg, MCPhysReg> dstRegMapTable,
+                                                                        int prefetchDist  ){
   BinaryContext& BC = BF.getBinaryContext();
 
   std::vector<MCInst> predInstrsForPrefetch;
@@ -811,6 +811,12 @@ BinaryBasicBlock* InjectPrefetchInnerLoop::createPrefetchBB(BinaryFunction& BF,
       }
     }
     llvm::outs()<<"#### "<<predInstrsForPrefetch.size()<<" "<<predInstrsForPrefetch.size()+3<<"\n";
+
+    std::vector<std::pair<int, int>> prefetchLoc;
+    prefetchLoc.push_back(std::make_pair(predInstrsForPrefetch.size(), predInstrsForPrefetch.size()+3));
+    BF.setPrefetchLocations(prefetchLoc);
+
+
     MCInst PrefetchInst;
     MCInst LoadPrefetchAddrInstr;
     BC.MIB->createPrefetchT0(PrefetchInst, TopLLCMissInstrNew.getOperand(0).getReg(), 0, TopLLCMissInstrNew.getOperand(2).getReg(), TopLLCMissInstrNew.getOperand(1).getImm(), BC.MIB->getNoRegister(), LoadPrefetchAddrInstr); 
@@ -828,6 +834,12 @@ BinaryBasicBlock* InjectPrefetchInnerLoop::createPrefetchBB(BinaryFunction& BF,
     PrefetchBBs.back()->addInstruction(Lea64rInstr);
 
     llvm::outs()<<"#### 1 4\n";
+
+
+    std::vector<std::pair<int, int>> prefetchLoc;
+    prefetchLoc.push_back(std::make_pair(1, 4));
+    BF.setPrefetchLocations(prefetchLoc);
+
 
     MCInst PrefetchInst;
     MCInst tmp;
