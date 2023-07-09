@@ -2858,6 +2858,10 @@ public:
       if (lower32bitReg == X86::ESP) return true;
       else return false;     
     }
+    else if (fullReg == X86::RIP){
+      if (lower32bitReg == X86::EIP) return true;
+      else return false;     
+    }
     else if (fullReg == X86::RBP){
       if (lower32bitReg == X86::EBP) return true;
       else return false;     

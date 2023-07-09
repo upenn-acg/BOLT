@@ -55,10 +55,10 @@ public:
                                      std::vector<MCInst*>, int prefetchDist, 
                                      MCPhysReg);
   BinaryBasicBlock* createPrefetchBB1(BinaryFunction&, BinaryBasicBlock*,
-                                      BinaryBasicBlock*, std::vector<MCInst*>,
-                                      int prefetchDist, 
-                                      MCPhysReg);
-
+                                      std::vector<MCInst*>,int prefetchDist, MCPhysReg);
+  BinaryBasicBlock* createPopRegBB(BinaryFunction&, BinaryBasicBlock*,
+                                   BinaryBasicBlock*,MCInst*,MCInst*,
+                                   MCPhysReg);
 };
 
 } // namespace bolt

@@ -324,8 +324,8 @@ void Prefetchable::getLoopInductionInstrs(BinaryFunction& BF,
       if (BC.MIB->isADD(Inst)){
         if ((Inst.getOperand(2).isImm()) &&
             (Inst.getOperand(0).getReg()==Inst.getOperand(1).getReg())){
-          LoopInductionInstr = (*I);
-          findLoopInduction = true;
+           LoopInductionInstr = (*I);
+           findLoopInduction = true;
         }
       }
       else if (BC.MIB->isCMP(Inst)){
@@ -337,7 +337,8 @@ void Prefetchable::getLoopInductionInstrs(BinaryFunction& BF,
               if (LoopInductionInstr.getOperand(0).getReg()==Inst.getOperand(i).getReg()){
                 LoopGuardCMPInstr = (*I);
               }
-              else if (BC.MIB->isLower32bitReg(LoopInductionInstr.getOperand(0).getReg(), Inst.getOperand(i).getReg())){
+              else if ((BC.MIB->is64bitReg(LoopInductionInstr.getOperand(0).getReg()))
+                      &&(BC.MIB->isLower32bitReg(LoopInductionInstr.getOperand(0).getReg(), Inst.getOperand(i).getReg()))){
                 LoopGuardCMPInstr =(*I);
               }
             }
