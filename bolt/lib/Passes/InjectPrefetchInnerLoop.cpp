@@ -226,6 +226,10 @@ bool InjectPrefetchInnerLoop::runOnFunction(BinaryFunction &BF) {
       //    PredsOfHeaderBB[i]->addBranchInstruction(BoundsCheckBB);
         }
       }
+      else{
+        PredsOfHeaderBB[i]->addBranchInstruction(BoundsCheckBB);
+      }
+
     } 
 
     // add pop instruction in Header Basic Blocks
