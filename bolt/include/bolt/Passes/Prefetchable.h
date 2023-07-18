@@ -27,6 +27,7 @@ private:
     long prefetchDist;
     MCPhysReg OuterLoopInductionReg;
     MCPhysReg InnerLoopInductionReg;
+    bool prefetchable;
   } TopLLCMissInfo;
 
 public:
@@ -48,7 +49,7 @@ public:
                                                         MCInst*, BinaryBasicBlock*);
   BinaryLoop* getOuterLoopForBB( BinaryFunction&, BinaryBasicBlock*);
   BinaryLoop* getInnerLoopForBB( BinaryFunction&, BinaryBasicBlock*);
-  void getLoopInductionInstrs(BinaryFunction& BF, BinaryLoop* Loop,
+  bool getLoopInductionInstrs(BinaryFunction& BF, BinaryLoop* Loop,
                               MCInst&, MCInst&);
   MCPhysReg getLoopInductionReg(BinaryFunction& BF,
                                 MCInst& LoopInductionInstr,

@@ -64,6 +64,14 @@ bool Prefetchable::runOnFunction(BinaryFunction &BF) {
           llvm::outs()<<"[Prefetchable] find instruction that causes the TOP LLC miss\n";
           if (BC.MIB->isLoad(Instr)){
             llvm::outs()<<"[Prefetchable] TOP LLC miss instruction is a load\n";           
+            TopLLCMissBBs.push_back(&BB);
+            TopLLCMissInstrs.push_back(&Instr); 
+            TopLLCMissInfo newInfo;
+            newInfo.TopLLCMissBB = &BB;
+            newInfo.TopLLCMissInstr = &Instr;
+            newInfo.prefetchDist = TopLLCMissAddrAndPrefDist[AbsoluteAddr];
+            newInfo.prefetchable = true;
+            TopLLCMissInfos.push_back(newInfo); 
           }
           else if (BC.MIB->isStore(Instr)){
             llvm::outs()<<"[Prefetchable] TOP LLC miss instruction is a store\n";
@@ -72,13 +80,6 @@ bool Prefetchable::runOnFunction(BinaryFunction &BF) {
             llvm::outs()<<"[Prefetchable] This pass only inject prefetch for load or store instruction\n";
             return false;
           }
-          TopLLCMissBBs.push_back(&BB);
-          TopLLCMissInstrs.push_back(&Instr); 
-          TopLLCMissInfo newInfo;
-          newInfo.TopLLCMissBB = &BB;
-          newInfo.TopLLCMissInstr = &Instr;
-          newInfo.prefetchDist = TopLLCMissAddrAndPrefDist[AbsoluteAddr];
-          TopLLCMissInfos.push_back(newInfo); 
         }
       }
     }
@@ -89,7 +90,7 @@ bool Prefetchable::runOnFunction(BinaryFunction &BF) {
     // the TOP LLC miss instruction. 
     BinaryBasicBlock* TopLLCMissBB = TopLLCMissInfos[i].TopLLCMissBB;
     MCInst* TopLLCMissInstr = TopLLCMissInfos[i].TopLLCMissInstr;
-  
+ 
     // get the loop (OuterLoop) that contains the Top LLC miss BB
     // later on we need to utilize the Header Basic Block of this 
     // loop
@@ -98,15 +99,36 @@ bool Prefetchable::runOnFunction(BinaryFunction &BF) {
 
     MCInst LoopInductionInstr; 
     MCInst LoopGuardCMPInstr;
-    getLoopInductionInstrs(BF, TopLLCMissInfos[i].OuterLoop, LoopInductionInstr, LoopGuardCMPInstr);
+    if (TopLLCMissInfos[i].OuterLoop==NULL){
+       TopLLCMissInfos[i].prefetchable = false;
+       continue;
+    }
+    if (!getLoopInductionInstrs(BF, TopLLCMissInfos[i].OuterLoop, LoopInductionInstr, LoopGuardCMPInstr)){
+       TopLLCMissInfos[i].prefetchable = false;
+       continue;
+    }
     TopLLCMissInfos[i].OuterLoopInductionReg = LoopInductionInstr.getOperand(0).getReg();
- 
+
     getLoopInductionInstrs(BF, TopLLCMissInfos[i].InnerLoop, LoopInductionInstr, LoopGuardCMPInstr);
     TopLLCMissInfos[i].InnerLoopInductionReg = LoopInductionInstr.getOperand(0).getReg();
 
+    bool hasInnerLoopInduction = false;
+    for (int j=0; j<TopLLCMissInstr->getNumOperands(); j++){
+      if (TopLLCMissInstr->getOperand(j).isReg()){
+        if (TopLLCMissInstr->getOperand(j).getReg() == TopLLCMissInfos[i].InnerLoopInductionReg){
+          hasInnerLoopInduction = true;
+          break;
+        }
+      }
+    }
+    if (!hasInnerLoopInduction){
+       TopLLCMissInfos[i].prefetchable = false;
+       continue;
+    }
     if (TopLLCMissInfos[i].OuterLoop == NULL){
-      llvm::outs()<<"[Prefetchable] The outer loop that contains top LLC miss BB doesn't exist\n";
-      continue;
+       TopLLCMissInfos[i].prefetchable = false;
+       llvm::outs()<<"[Prefetchable] The outer loop that contains top LLC miss BB doesn't exist\n";
+       continue;
     }
 
     // get all destination register of load instructions in the 
@@ -131,7 +153,10 @@ bool Prefetchable::runOnFunction(BinaryFunction &BF) {
     std::vector<MCInst*> predLoadInstrs;
     MCInst* predLoad = TopLLCMissInstr;
     BinaryBasicBlock* predLoadBB = TopLLCMissBB;
-    while (DstRegsInOuterLoop.find(predLoad->getOperand(1).getReg()) != DstRegsInOuterLoop.end()){
+    if (!TopLLCMissInstr->getOperand(1).isReg()) continue;
+    MCPhysReg newReg = predLoad->getOperand(1).getReg();
+    while ((predLoad->getOperand(1).isReg())&&
+           (DstRegsInOuterLoop.find(predLoad->getOperand(1).getReg()) != DstRegsInOuterLoop.end())) {
       predLoadInstrs.push_back(predLoad);
       auto newDemandLoadPkg = findDemandLoad(BF, TopLLCMissInfos[i].OuterLoop, predLoad, predLoadBB);
       predLoad = newDemandLoadPkg.first;
@@ -140,6 +165,7 @@ bool Prefetchable::runOnFunction(BinaryFunction &BF) {
       predLoadBB = newDemandLoadPkg.second;
     }
     if (predLoad !=NULL) predLoadInstrs.push_back(predLoad);
+    
     MCInst DemandLoadInstr = *(predLoadInstrs[1]);
 
     TopLLCMissInfos[i].predLoadInstrs = predLoadInstrs;
@@ -150,6 +176,7 @@ bool Prefetchable::runOnFunction(BinaryFunction &BF) {
   BinaryLoop* InnerLoopForAll = NULL;
   for (unsigned i=0; i<TopLLCMissInfos.size(); i++){
     if (TopLLCMissInfos[i].OuterLoop == NULL) continue;
+    if (!TopLLCMissInfos[i].prefetchable) continue;
     if ((TopLLCMissInfos[i].TopLLCMissInstr->getOperand(3).getReg()==TopLLCMissInfos[i].InnerLoopInductionReg) &&
         (TopLLCMissInfos[i].DemandLoadInstr.getOperand(3).getReg()==TopLLCMissInfos[i].OuterLoopInductionReg))
     {
@@ -162,6 +189,7 @@ bool Prefetchable::runOnFunction(BinaryFunction &BF) {
   std::vector<TopLLCMissInfo> PrefetchableInfos;
   for (unsigned i=0; i<TopLLCMissInfos.size(); i++){
     if (TopLLCMissInfos[i].OuterLoop == NULL) continue;
+    if (!TopLLCMissInfos[i].prefetchable) continue;
     if (TopLLCMissInfos[i].InnerLoop != InnerLoopForAll) continue;
     if (TopLLCMissInfos[i].OuterLoop != OuterLoopForAll) continue;
     if ((TopLLCMissInfos[i].TopLLCMissInstr->getOperand(3).getReg()!=TopLLCMissInfos[i].InnerLoopInductionReg) ||
@@ -301,17 +329,17 @@ BinaryLoop* Prefetchable::getOuterLoopForBB( BinaryFunction& BF,
 
 
 
-void Prefetchable::getLoopInductionInstrs(BinaryFunction& BF, 
-                            BinaryLoop* Loop,
-                            MCInst& LoopInductionInstr,
-                            MCInst& LoopGuardCMPInstr){
+bool Prefetchable::getLoopInductionInstrs(BinaryFunction& BF, 
+                                          BinaryLoop* Loop,
+                                          MCInst& LoopInductionInstr,
+                                          MCInst& LoopGuardCMPInstr){
 
   BinaryContext& BC = BF.getBinaryContext();
   SmallVector<BinaryBasicBlock *, 1> Latches;
   Loop->getLoopLatches(Latches);
   llvm::outs()<<"[Prefetchable] number of latches in the outer loop: "<< Latches.size()<<"\n";
 
-  if (Latches.size()==0) return;
+  if (Latches.size()==0) return false;
   
   // Here we assume that LoopInductionInstr is always 
   // LoopGuradCMPInstr. This is a reasonable assumption 
@@ -336,10 +364,12 @@ void Prefetchable::getLoopInductionInstrs(BinaryFunction& BF,
               // namely the loop induction variable
               if (LoopInductionInstr.getOperand(0).getReg()==Inst.getOperand(i).getReg()){
                 LoopGuardCMPInstr = (*I);
+                return true;
               }
               else if ((BC.MIB->is64bitReg(LoopInductionInstr.getOperand(0).getReg()))
                       &&(BC.MIB->isLower32bitReg(LoopInductionInstr.getOperand(0).getReg(), Inst.getOperand(i).getReg()))){
                 LoopGuardCMPInstr =(*I);
+                return true;
               }
             }
           }
@@ -347,6 +377,7 @@ void Prefetchable::getLoopInductionInstrs(BinaryFunction& BF,
       }
     }
   }
+  return false;
 }
 
 
@@ -354,8 +385,8 @@ void Prefetchable::getLoopInductionInstrs(BinaryFunction& BF,
 
 
 MCPhysReg Prefetchable::getLoopInductionReg(BinaryFunction& BF,
-                              MCInst& LoopInductionInstr,
-                              MCInst& LoopGuardCMPInstr){
+                                            MCInst& LoopInductionInstr,
+                                            MCInst& LoopGuardCMPInstr){
   BinaryContext& BC = BF.getBinaryContext();
   MCPhysReg LoopInductionReg;
   for (int i=0; i<LoopGuardCMPInstr.getNumOperands(); i++){

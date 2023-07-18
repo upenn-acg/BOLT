@@ -486,11 +486,11 @@ void BinaryFunctionPassManager::runAllPasses(BinaryContext &BC) {
 */
 
   // zyuxuan: for CRONO workloads
-//  Manager.registerPass(std::make_unique<InjectPrefetchPass>());
-//  Manager.registerPass(std::make_unique<Prefetchable>());
+  Manager.registerPass(std::make_unique<InjectPrefetchPass>());
+  Manager.registerPass(std::make_unique<Prefetchable>());
 
   // for nas-is, randacc, nas-cg
-  Manager.registerPass(std::make_unique<InjectPrefetchInnerLoop>());
+//  Manager.registerPass(std::make_unique<InjectPrefetchInnerLoop>());
 //  Manager.registerPass(std::make_unique<PrefetchableInnerLoop>());
 
 
