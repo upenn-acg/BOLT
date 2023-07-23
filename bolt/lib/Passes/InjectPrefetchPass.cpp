@@ -42,6 +42,9 @@ bool InjectPrefetchPass::runOnFunction(BinaryFunction &BF) {
   std::string demangledFuncName = removeSuffix(BF.getDemangledName());
   //std::unordered_set<uint64_t> TopLLCMissAddrs = TopLLCMissLocations[demangledFuncName];
   std::unordered_map<uint64_t, long> TopLLCMissAddrAndPrefDist = TopLLCMissLocations[demangledFuncName];
+  if (TopLLCMissAddrAndPrefDist.empty()) {
+    llvm::outs()<<"[InjectPrefetchPass] the input file doesn't contain any prefetch locations\n";
+  }
   //uint64_t TopLLCMissAddr = *(TopLLCMissAddrs.begin());
 
   llvm::outs()<<"[InjectPrefetchPass] The starting address of "<<demangledFuncName<<" is: 0x"
@@ -243,17 +246,30 @@ bool InjectPrefetchPass::runOnFunction(BinaryFunction &BF) {
     if ((TopLLCMissInfos[i].OuterLoop == NULL) ||
        (TopLLCMissInfos[i].OuterLoop != OuterLoop))   
       continue; 
+
+    TopLLCMissInfos[i].dstRegMapTable = getDstRegMapTable(BF, TopLLCMissInfos[i].predLoadInstrs, 
+                                                          TopLLCMissInfos[i].TopLLCMissInstr);
+
+    llvm::outs()<<"#### dstRegMapTable's size = "<<TopLLCMissInfos[i].dstRegMapTable.size()<<"\n";
+
+    std::vector<MCInst> predInstrsForPrefetch = getPredInstrsForPrefetch ( BF, LoopInductionInstr, 
+                                                                           TopLLCMissInfos[i].TopLLCMissInstr,
+                                                                           TopLLCMissInfos[i].predLoadInstrs, 
+                                                                           TopLLCMissInfos[i].dstRegMapTable,
+                                                                           TopLLCMissInfos[i].prefetchDist );
+
+
     if (i==0){
       TopLLCMissInfos[i].BoundsCheckBB = createBoundsCheckBB0(BF, HeaderBB, 
                                                               LoopGuardCMPInstr,
                                                               LoopInductionInstr, 
                                                               TopLLCMissInfos[i].prefetchDist,
-                                                              freeReg);
+                                                              TopLLCMissInfos[i].dstRegMapTable);
 
       TopLLCMissInfos[i].PrefetchBB = createPrefetchBB(BF, TopLLCMissInfos[i].BoundsCheckBB,
                                                        TopLLCMissInfos[i].predLoadInstrs, 
                                                        TopLLCMissInfos[i].prefetchDist, 
-                                                       freeReg);
+                                                       TopLLCMissInfos[i].dstRegMapTable);
 
       // change the control-flow-graph 
       // first add set PrefetchBB to be the successor of
@@ -281,12 +297,13 @@ bool InjectPrefetchPass::runOnFunction(BinaryFunction &BF) {
                                                              LoopGuardCMPInstr,
                                                              LoopInductionInstr, 
                                                              TopLLCMissInfos[i].prefetchDist,
-                                                             freeReg);
+                                                             TopLLCMissInfos[i-1].dstRegMapTable,
+                                                             TopLLCMissInfos[i].dstRegMapTable);
 
       TopLLCMissInfos[i].PrefetchBB = createPrefetchBB1(BF, TopLLCMissInfos[i].BoundsCheckBB,
                                                         TopLLCMissInfos[i].predLoadInstrs, 
                                                         TopLLCMissInfos[i].prefetchDist, 
-                                                        freeReg);
+                                                        TopLLCMissInfos[i].dstRegMapTable);
 
       TopLLCMissInfos[i].BoundsCheckBB->addSuccessor(TopLLCMissInfos[i].PrefetchBB);
 
@@ -298,12 +315,13 @@ bool InjectPrefetchPass::runOnFunction(BinaryFunction &BF) {
                                                              LoopGuardCMPInstr,
                                                              LoopInductionInstr, 
                                                              TopLLCMissInfos[i].prefetchDist,
-                                                             freeReg);
+                                                             TopLLCMissInfos[i-1].dstRegMapTable,
+                                                             TopLLCMissInfos[i].dstRegMapTable);
 
       TopLLCMissInfos[i].PrefetchBB = createPrefetchBB(BF, TopLLCMissInfos[i].BoundsCheckBB,
                                                        TopLLCMissInfos[i].predLoadInstrs, 
                                                        TopLLCMissInfos[i].prefetchDist,
-                                                       freeReg);
+                                                       TopLLCMissInfos[i].dstRegMapTable);
 
       TopLLCMissInfos[i].BoundsCheckBB->addSuccessor(TopLLCMissInfos[i].PrefetchBB);
     }
@@ -311,7 +329,7 @@ bool InjectPrefetchPass::runOnFunction(BinaryFunction &BF) {
 
   BinaryBasicBlock* PopRegBB = createPopRegBB(BF,TopLLCMissInfos[TopLLCMissInfos.size()-1].BoundsCheckBB,
                                               TopLLCMissInfos[TopLLCMissInfos.size()-1].PrefetchBB,
-                                              LoopGuardCMPInstr, LoopInductionInstr,freeReg);
+                                              LoopGuardCMPInstr, LoopInductionInstr,TopLLCMissInfos[TopLLCMissInfos.size()-1].dstRegMapTable);
 
   PopRegBB->addSuccessor(HeaderBB);
   HeaderBB->addPredecessor(PopRegBB);
@@ -526,8 +544,9 @@ BinaryBasicBlock* InjectPrefetchPass::createBoundsCheckBB0(BinaryFunction& BF,
                                       MCInst* LoopGuardCMPInstr,
                                       MCInst* LoopInductionInstr,
                                       int prefetchDist,
-                                      MCPhysReg freeReg){
+                                      std::unordered_map<MCPhysReg, MCPhysReg> DstRegMapTable){
   BinaryContext& BC = BF.getBinaryContext();
+  MCPhysReg freeReg = DstRegMapTable.begin()->second;
   // before we change the CFG of this function to add the 
   // BoundCHeckBB and PrefetchBB, we need to save all the 
   // predecessors of the HeaderBB   
@@ -558,9 +577,11 @@ BinaryBasicBlock* InjectPrefetchPass::createBoundsCheckBB0(BinaryFunction& BF,
 */
   // add instructions
   // create push %rax
-  MCInst PushInst; 
-  BC.MIB->createPushRegister(PushInst, freeReg, 8);
-  BoundCheckBBs.back()->addInstruction(PushInst);
+  for (auto it = DstRegMapTable.begin(); it != DstRegMapTable.end(); it++){
+    MCInst PushInst; 
+    BC.MIB->createPushRegister(PushInst, it->second, 8);
+    BoundCheckBBs.back()->addInstruction(PushInst);
+  }
 
   // create mov %rdx, %rax
   MCInst MovInstr;
@@ -643,8 +664,10 @@ BinaryBasicBlock* InjectPrefetchPass::createBoundsCheckBB(BinaryFunction& BF,
                                                           MCInst* LoopGuardCMPInstr,
                                                           MCInst* LoopInductionInstr,
                                                           int prefetchDist,
-                                                          MCPhysReg freeReg){
+                                                          std::unordered_map<MCPhysReg, MCPhysReg> PrevDstRegMapTable,
+                                                          std::unordered_map<MCPhysReg, MCPhysReg> DstRegMapTable){
   BinaryContext& BC = BF.getBinaryContext();
+  MCPhysReg freeReg = DstRegMapTable.begin()->second;
 
   // create the boundary check basic block
   // in this BB, it contains the following 4 instructions
@@ -661,6 +684,27 @@ BinaryBasicBlock* InjectPrefetchPass::createBoundsCheckBB(BinaryFunction& BF,
   // add predecessor  
   BoundCheckBBs.back()->addPredecessor(PriorBoundsCheckBB);
   BoundCheckBBs.back()->addPredecessor(PriorPrefetchBB);
+
+
+  std::vector<MCPhysReg> regs;
+  for (auto it=PrevDstRegMapTable.begin(); it != PrevDstRegMapTable.end(); it++){
+     regs.push_back(it->second);
+  }
+  // create mov %rdx, %rax
+  int size = (int)regs.size();
+  for (int i = size-1; i>=0; i--) {
+     MCInst PopRegInstr;
+     BC.MIB->createPopRegister(PopRegInstr, regs[i], 8);
+     BoundCheckBBs.back()->addInstruction(PopRegInstr);
+  }
+
+
+
+  for (auto it = DstRegMapTable.begin(); it != DstRegMapTable.end(); it++){
+    MCInst PushInst; 
+    BC.MIB->createPushRegister(PushInst, it->second, 8);
+    BoundCheckBBs.back()->addInstruction(PushInst);
+  }
 
   // create mov %rdx, %rax
   MCInst MovInstr;
@@ -739,7 +783,7 @@ BinaryBasicBlock* InjectPrefetchPass::createPrefetchBB(BinaryFunction& BF,
                                                        BinaryBasicBlock* BoundsCheckBB,
                                                        std::vector<MCInst*> predLoadInstrs,
                                                        int prefetchDist,
-                                                       MCPhysReg freeReg){
+                                                       std::unordered_map<MCPhysReg, MCPhysReg> DstRegMapTable){
 
   BinaryContext& BC = BF.getBinaryContext();
   
@@ -761,9 +805,14 @@ BinaryBasicBlock* InjectPrefetchPass::createPrefetchBB(BinaryFunction& BF,
     MCInst predLoad;
     predLoad.setOpcode(predLoadInstrs[idx]->getOpcode());
     for (int i=0; i<numOperands; i++){
-      if (i==4){
+      if ((predLoadInstrs[idx]->getOperand(i).isReg()) && 
+          (DstRegMapTable.find(predLoadInstrs[idx]->getOperand(i).getReg())!=DstRegMapTable.end())) {
+         MCPhysReg newReg = DstRegMapTable.at(predLoadInstrs[idx]->getOperand(i).getReg());
+         predLoad.addOperand(MCOperand::createReg(newReg));
+      }
+      else if (i==4){
         if (predLoadInstrs[idx]->getOperand(1).getReg()==BC.MIB->getStackPointer()){
-           predLoad.addOperand(MCOperand::createImm(predLoadInstrs[idx]->getOperand(4).getImm()+8));
+           predLoad.addOperand(MCOperand::createImm(predLoadInstrs[idx]->getOperand(4).getImm()+8*DstRegMapTable.size()));
         }
         else {
           predLoad.addOperand(predLoadInstrs[idx]->getOperand(i));
@@ -784,9 +833,10 @@ BinaryBasicBlock* InjectPrefetchPass::createPrefetchBB(BinaryFunction& BF,
   MCInst LoadPrefetchAddrInstr;
   LoadPrefetchAddrInstr.setOpcode(DemandLoadInstr.getOpcode());
   for (int i=0; i<numOperands; i++){
-    if (i==0){
-      // the first operand is the dest reg
-      LoadPrefetchAddrInstr.addOperand(MCOperand::createReg(freeReg)); 
+    if ((DemandLoadInstr.getOperand(i).isReg()) &&
+       (DstRegMapTable.find(DemandLoadInstr.getOperand(i).getReg())!=DstRegMapTable.end())) {
+      MCPhysReg newReg = DstRegMapTable.at(DemandLoadInstr.getOperand(i).getReg());
+      LoadPrefetchAddrInstr.addOperand(MCOperand::createReg(newReg));
     }
     else if (i==4){
       // the 5th operand is the offset
@@ -806,7 +856,7 @@ BinaryBasicBlock* InjectPrefetchPass::createPrefetchBB(BinaryFunction& BF,
   // add prefetch instruction
   // prefetcht0 (%rax) 
   MCInst PrefetchInst;
-  BC.MIB->createPrefetchT0(PrefetchInst, freeReg, 0, BC.MIB->getNoRegister(), 0, BC.MIB->getNoRegister(), LoadPrefetchAddrInstr);
+  BC.MIB->createPrefetchT0(PrefetchInst, LoadPrefetchAddrInstr.getOperand(0).getReg(), 0, BC.MIB->getNoRegister(), 0, BC.MIB->getNoRegister(), LoadPrefetchAddrInstr);
 
   PrefetchBBs.back()->addInstruction(PrefetchInst);
 
@@ -828,7 +878,7 @@ BinaryBasicBlock* InjectPrefetchPass::createPrefetchBB1(BinaryFunction& BF,
                                       BinaryBasicBlock* BoundsCheckBB,
                                       std::vector<MCInst*> predLoadInstrs,
                                       int prefetchDist,
-                                      MCPhysReg freeReg){
+                                      std::unordered_map<MCPhysReg, MCPhysReg> DstRegMapTable){
 
   BinaryContext& BC = BF.getBinaryContext();
   
@@ -846,14 +896,21 @@ BinaryBasicBlock* InjectPrefetchPass::createPrefetchBB1(BinaryFunction& BF,
   // for prefetch. 
   // Note: here might be a dependency chain.
 
+
+
   for (unsigned idx = predLoadInstrs.size()-1 ; idx > 1 ; idx --){
     int numOperands = predLoadInstrs[idx]->getNumOperands();
     MCInst predLoad;
     predLoad.setOpcode(predLoadInstrs[idx]->getOpcode());
     for (int i=0; i<numOperands; i++){
-      if (i==4){
+      if ((predLoadInstrs[idx]->getOperand(i).isReg()) && 
+          (DstRegMapTable.find(predLoadInstrs[idx]->getOperand(i).getReg())!=DstRegMapTable.end())) {
+         MCPhysReg newReg = DstRegMapTable.at(predLoadInstrs[idx]->getOperand(i).getReg());
+         predLoad.addOperand(MCOperand::createReg(newReg));
+      }
+      else if (i==4){
         if (predLoadInstrs[idx]->getOperand(1).getReg()==BC.MIB->getStackPointer()){
-          predLoad.addOperand(MCOperand::createImm(predLoadInstrs[idx]->getOperand(4).getImm()+8));
+           predLoad.addOperand(MCOperand::createImm(predLoadInstrs[idx]->getOperand(4).getImm()+8*DstRegMapTable.size()));
         }
         else {
           predLoad.addOperand(predLoadInstrs[idx]->getOperand(i));
@@ -874,9 +931,10 @@ BinaryBasicBlock* InjectPrefetchPass::createPrefetchBB1(BinaryFunction& BF,
   MCInst LoadPrefetchAddrInstr;
   LoadPrefetchAddrInstr.setOpcode(DemandLoadInstr.getOpcode());
   for (int i=0; i<numOperands; i++){
-    if (i==0){
-      // the first operand is the dest reg
-      LoadPrefetchAddrInstr.addOperand(MCOperand::createReg(freeReg)); 
+    if ((DemandLoadInstr.getOperand(i).isReg()) &&
+       (DstRegMapTable.find(DemandLoadInstr.getOperand(i).getReg())!=DstRegMapTable.end())) {
+      MCPhysReg newReg = DstRegMapTable.at(DemandLoadInstr.getOperand(i).getReg());
+      LoadPrefetchAddrInstr.addOperand(MCOperand::createReg(newReg));
     }
     else if (i==4){
       // the 5th operand is the offset
@@ -898,7 +956,7 @@ BinaryBasicBlock* InjectPrefetchPass::createPrefetchBB1(BinaryFunction& BF,
   // add prefetch instruction
   // prefetcht0 (%rax) 
   MCInst PrefetchInst;
-  BC.MIB->createPrefetchT0(PrefetchInst, freeReg, 0, BC.MIB->getNoRegister(), 0, BC.MIB->getNoRegister(), LoadPrefetchAddrInstr);
+  BC.MIB->createPrefetchT0(PrefetchInst, LoadPrefetchAddrInstr.getOperand(0).getReg(), 0, BC.MIB->getNoRegister(), 0, BC.MIB->getNoRegister(), LoadPrefetchAddrInstr);
 
   PrefetchBBs.back()->addInstruction(PrefetchInst);
 
@@ -924,8 +982,13 @@ BinaryBasicBlock* InjectPrefetchPass::createPopRegBB(BinaryFunction& BF,
                                                      BinaryBasicBlock* PriorPrefetchBB,
                                                      MCInst* LoopGuardCMPInstr,
                                                      MCInst* LoopInductionInstr,
-                                                     MCPhysReg freeReg){
+                                                     std::unordered_map<MCPhysReg, MCPhysReg> DstRegMapTable){
   BinaryContext& BC = BF.getBinaryContext();
+
+  std::vector<MCPhysReg> regs;
+  for (auto it=DstRegMapTable.begin(); it != DstRegMapTable.end(); it++){
+     regs.push_back(it->second);
+  }
 
   // create the boundary check basic block
   // in this BB, it contains the following 4 instructions
@@ -944,10 +1007,12 @@ BinaryBasicBlock* InjectPrefetchPass::createPopRegBB(BinaryFunction& BF,
   PopRegBBs.back()->addPredecessor(PriorPrefetchBB);
 
   // create mov %rdx, %rax
-  MCInst PopRegInstr;
-  BC.MIB->createPopRegister(PopRegInstr, freeReg, 8);
-  PopRegBBs.back()->addInstruction(PopRegInstr);
-
+  int size = (int)regs.size();
+  for (int i = size-1; i>=0; i--) {
+     MCInst PopRegInstr;
+     BC.MIB->createPopRegister(PopRegInstr, regs[i], 8);
+     PopRegBBs.back()->addInstruction(PopRegInstr);
+  }
   // insert this Basic Block to binary function
   // TODO: change the way to decide the BB for injecting
   BF.insertBasicBlocks(PriorPrefetchBB, std::move(PopRegBBs));
@@ -1017,6 +1082,126 @@ std::unordered_map<std::string, std::unordered_map<uint64_t, long>> InjectPrefet
 
 
 
+std::unordered_map<MCPhysReg, MCPhysReg> InjectPrefetchPass::getDstRegMapTable (BinaryFunction& BF,
+                                                                                std::vector<MCInst*> predInstrs,
+                                                                                MCInst* TopLLCMissInstrP){
+  BinaryContext& BC = BF.getBinaryContext();
+
+  std::vector<MCInst*> predInstrsWithoutFirst = predInstrs;
+  predInstrsWithoutFirst.erase(predInstrsWithoutFirst.begin());
+
+  std::unordered_set<MCPhysReg> usedRegs;
+  for (auto instr: predInstrsWithoutFirst){
+    int numOperands = instr->getNumOperands();
+    for (int j=0; j<numOperands; j++){
+      if (instr->getOperand(j).isReg()){
+        MCPhysReg reg = instr->getOperand(j).getReg();
+        if (BC.MIB->is32bitReg(reg)) reg = BC.MIB->get64bitReg(reg);
+        if (usedRegs.find(reg) == usedRegs.end()) usedRegs.insert(reg);
+      }
+    }
+  }
+
+  for (int i=0; i<TopLLCMissInstrP->getNumOperands(); i++){
+    if (TopLLCMissInstrP->getOperand(i).isReg()){
+      MCPhysReg reg = TopLLCMissInstrP->getOperand(i).getReg();
+      if (usedRegs.find(reg) == usedRegs.end()) usedRegs.insert(reg);
+    }
+  }
+
+  llvm::outs()<<"number of used regs: "<<usedRegs.size()<<"\n";
+
+  std::unordered_map<MCPhysReg, MCPhysReg> dstRegMapTable;
+  for (auto instr: predInstrsWithoutFirst){
+    if (!BC.MIB->isStore(*instr)){
+      if (instr->getOperand(0).isReg()){
+        MCPhysReg dstReg = instr->getOperand(0).getReg();
+        if (BC.MIB->is32bitReg(dstReg)) dstReg = BC.MIB->get64bitReg(dstReg);
+        if ((dstRegMapTable.find(dstReg))==(dstRegMapTable.end())){
+          MCPhysReg newReg = BC.MIB->getUnusedReg(usedRegs);
+          usedRegs.insert(newReg);
+          dstRegMapTable.insert(std::make_pair(dstReg, newReg));
+        }
+      }
+    }
+  }
+
+  // this case is for nas-is
+  if (predInstrs.size()==0){
+    if (TopLLCMissInstrP->getOperand(0).isReg()){
+      MCPhysReg dstReg = TopLLCMissInstrP->getOperand(0).getReg();
+      if (BC.MIB->is32bitReg(dstReg)) dstReg = BC.MIB->get64bitReg(dstReg);
+      if ((dstRegMapTable.find(dstReg))==(dstRegMapTable.end())){
+        MCPhysReg newReg = BC.MIB->getUnusedReg(usedRegs);
+        usedRegs.insert(newReg);
+        dstRegMapTable.insert(std::make_pair(dstReg, newReg));
+      }
+    }
+  }
+
+  llvm::outs()<<"number of dstRegs: "<<dstRegMapTable.size()<<"\n";
+  return dstRegMapTable;
+}
+
+
+
+
+
+std::vector<MCInst> InjectPrefetchPass::getPredInstrsForPrefetch ( BinaryFunction& BF,
+                                                                   MCInst* LoopInductionInstr,
+                                                                   MCInst* TopLLCMissInstrP,
+                                                                   std::vector<MCInst*> predInstrs,
+                                                                   std::unordered_map<MCPhysReg, MCPhysReg> dstRegMapTable,
+                                                                   int prefetchDist  ){
+  BinaryContext& BC = BF.getBinaryContext();
+
+  std::vector<MCInst> predInstrsForPrefetch;
+
+
+  if (predInstrs.size()!=0){
+    for (auto instr: predInstrs){
+      MCInst newInstr;
+      if (BC.MIB->isStore(*instr)) continue;
+      newInstr.setOpcode(instr->getOpcode());
+      for (int j=0; j<instr->getNumOperands(); j++){
+        if (instr->getOperand(j).isReg()){
+          MCPhysReg reg = instr->getOperand(j).getReg();
+          if (BC.MIB->is32bitReg(reg)) reg = BC.MIB->get64bitReg(reg);
+          if (dstRegMapTable.find(reg) != dstRegMapTable.end()) {
+            newInstr.addOperand(MCOperand::createReg(dstRegMapTable[reg]));
+          }
+          else{
+            newInstr.addOperand(instr->getOperand(j));
+          }
+        }
+        else {
+          newInstr.addOperand(instr->getOperand(j));
+        }
+      }
+      predInstrsForPrefetch.push_back(newInstr);
+    }
+
+    MCInst newPredInstr;
+    newPredInstr.setOpcode(predInstrsForPrefetch[0].getOpcode());
+    for (int j=0; j<predInstrsForPrefetch[0].getNumOperands(); j++){
+      if (j!=4){
+        newPredInstr.addOperand(predInstrsForPrefetch[0].getOperand(j));
+      }
+      else{
+        newPredInstr.addOperand(MCOperand::createImm(prefetchDist));
+      }
+    }
+    predInstrsForPrefetch[0] = newPredInstr;
+  }
+  return predInstrsForPrefetch;
+}
+
+
+
+
+
+
+
 std::string InjectPrefetchPass::removeSuffix(std::string FuncName){
    return FuncName.substr(0, FuncName.find("("));
 }
@@ -1030,6 +1215,10 @@ void InjectPrefetchPass::runOnFunctions(BinaryContext &BC) {
    if (opts::PrefetchLocationFile.empty()) return;
    TopLLCMissLocations 
       = getTopLLCMissLocationFromFile();
+   if (TopLLCMissLocations.empty()){
+      llvm::outs()<<"[InjectPrefetchPass] the input file doesn't contain anything\n";
+      return;
+   }
 
 
    for (auto &it: BC.getBinaryFunctions()){

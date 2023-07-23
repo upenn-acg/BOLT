@@ -27,6 +27,7 @@ private:
     BinaryBasicBlock* BoundsCheckBB;
     BinaryBasicBlock* PrefetchBB;
     long prefetchDist;
+    std::unordered_map<MCPhysReg, MCPhysReg> dstRegMapTable;
   } TopLLCMissInfo;
 
 public:
@@ -47,18 +48,31 @@ public:
   BinaryLoop* getInnerLoopForBB( BinaryFunction&, BinaryBasicBlock*);
   BinaryBasicBlock* createBoundsCheckBB0(BinaryFunction&, BinaryBasicBlock*,
                                         MCInst*, MCInst*, int prefetchDist,
-                                        MCPhysReg);
+                                        std::unordered_map<MCPhysReg, MCPhysReg>);
   BinaryBasicBlock* createBoundsCheckBB(BinaryFunction&, BinaryBasicBlock*,
                                         BinaryBasicBlock*, MCInst*, MCInst*, 
-                                        int prefetchDist, MCPhysReg);
+                                        int prefetchDist, 
+                                        std::unordered_map<MCPhysReg, MCPhysReg>,
+                                        std::unordered_map<MCPhysReg, MCPhysReg>);
   BinaryBasicBlock* createPrefetchBB(BinaryFunction&, BinaryBasicBlock*,
                                      std::vector<MCInst*>, int prefetchDist, 
-                                     MCPhysReg);
+                                     std::unordered_map<MCPhysReg, MCPhysReg>);
   BinaryBasicBlock* createPrefetchBB1(BinaryFunction&, BinaryBasicBlock*,
-                                      std::vector<MCInst*>,int prefetchDist, MCPhysReg);
+                                      std::vector<MCInst*>,int prefetchDist,
+                                      std::unordered_map<MCPhysReg, MCPhysReg>);
   BinaryBasicBlock* createPopRegBB(BinaryFunction&, BinaryBasicBlock*,
                                    BinaryBasicBlock*,MCInst*,MCInst*,
-                                   MCPhysReg);
+                                   std::unordered_map<MCPhysReg, MCPhysReg>);
+  std::unordered_map<MCPhysReg, MCPhysReg> getDstRegMapTable (BinaryFunction& BF,
+                                                              std::vector<MCInst*> predInstrs,
+                                                              MCInst* TopLLCMissInstrP); 
+  std::vector<MCInst> getPredInstrsForPrefetch ( BinaryFunction& BF,
+                                                 MCInst* LoopInductionInstr,
+                                                 MCInst* TopLLCMissInstrP,
+                                                 std::vector<MCInst*> predInstrs,
+                                                 std::unordered_map<MCPhysReg, MCPhysReg> dstRegMapTable,
+                                                 int prefetchDist);
+     
 };
 
 } // namespace bolt

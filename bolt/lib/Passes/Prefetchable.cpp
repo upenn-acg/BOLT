@@ -44,6 +44,10 @@ bool Prefetchable::runOnFunction(BinaryFunction &BF) {
   std::string demangledFuncName = removeSuffix(BF.getDemangledName());
   //std::unordered_set<uint64_t> TopLLCMissAddrs = TopLLCMissLocations[demangledFuncName];
   std::unordered_map<uint64_t, long> TopLLCMissAddrAndPrefDist = TopLLCMissLocations[demangledFuncName];
+  if (TopLLCMissAddrAndPrefDist.empty()){
+    llvm::outs()<<"[Prefetchable] input file doesn't contain any prefetch locations\n"; 
+    return false;
+  }
   //uint64_t TopLLCMissAddr = *(TopLLCMissAddrs.begin());
 
   llvm::outs()<<"[Prefetchable] The starting address of "<<demangledFuncName<<" is: 0x"
@@ -604,7 +608,7 @@ void Prefetchable::runOnFunctions(BinaryContext &BC) {
    if (opts::PrefetchLocationFile.empty()) return;
    TopLLCMissLocations 
       = getTopLLCMissLocationFromFile();
-
+   if (TopLLCMissLocations.empty()) return;
 
    for (auto &it: BC.getBinaryFunctions()){
       std::string FunctionFullName = it.second.getDemangledName();
