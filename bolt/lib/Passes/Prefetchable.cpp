@@ -577,7 +577,7 @@ void Prefetchable::writeTopLLCMissLocationToFile(BinaryFunction& BF,
    f.open(FileName, std::ios::out); 
  
    if (f.is_open()) { 
-      f << FuncName << " ";
+      if (!prefetchableInfos.empty()) f << FuncName << " ";
       for (unsigned i=0; i<prefetchableInfos.size(); i++){
          if (BC.MIB->hasAnnotation(*(prefetchableInfos[i].TopLLCMissInstr), "AbsoluteAddr")){
             uint64_t AbsoluteAddr = (uint64_t)BC.MIB->getAnnotationAs<uint64_t>(*(prefetchableInfos[i].TopLLCMissInstr), "AbsoluteAddr");
