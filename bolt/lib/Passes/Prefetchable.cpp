@@ -82,7 +82,7 @@ bool Prefetchable::runOnFunction(BinaryFunction &BF) {
           }
           else {
             llvm::outs()<<"[Prefetchable] This pass only inject prefetch for load or store instruction\n";
-            return false;
+            //return false;
           }
         }
       }
@@ -94,7 +94,7 @@ bool Prefetchable::runOnFunction(BinaryFunction &BF) {
     // the TOP LLC miss instruction. 
     BinaryBasicBlock* TopLLCMissBB = TopLLCMissInfos[i].TopLLCMissBB;
     MCInst* TopLLCMissInstr = TopLLCMissInfos[i].TopLLCMissInstr;
- 
+    llvm::outs()<<"#######################\n"; 
     // get the loop (OuterLoop) that contains the Top LLC miss BB
     // later on we need to utilize the Header Basic Block of this 
     // loop
