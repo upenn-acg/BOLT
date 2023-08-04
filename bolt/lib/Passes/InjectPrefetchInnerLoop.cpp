@@ -75,7 +75,8 @@ bool InjectPrefetchInnerLoop::runOnFunction(BinaryFunction &BF) {
           newInfo.TopLLCMissBB = &BB;
           newInfo.TopLLCMissInstr = &Instr;
           newInfo.PrefetchDist = TopLLCMissAddrs[AbsoluteAddr];
-          TopLLCMissInfos.push_back(newInfo); 
+          TopLLCMissInfos.push_back(newInfo);
+          break;
           // TopLLCMissBB = &BB;
           // TopLLCMissInstr = &Instr;
         }
@@ -84,6 +85,7 @@ bool InjectPrefetchInnerLoop::runOnFunction(BinaryFunction &BF) {
   }
 
   for (unsigned i=0; i!=TopLLCMissInfos.size(); i++){
+
     // get the Instruction and Basic Block that contains 
     // the TOP LLC miss instruction. 
 
@@ -908,10 +910,12 @@ std::unordered_map<std::string, std::unordered_map<uint64_t, long>> InjectPrefet
             llvm::outs()<<"[InjectPrefetchPass] Error: The format of the prefetch-loc-file is wrong\n";
             exit(1);
          }
-         for (unsigned i=1; i<words.size(); i=i+2){ 
-            uint64_t addr = stoi(words[i], 0, 16);
+//         for (unsigned i=1; i<words.size(); i=i+2){ 
+         for (unsigned i=1; i<3; i=i+2){ 
+           uint64_t addr = stoi(words[i], 0, 16);
             long pref_dist = stoi(words[i+1],0, 10);
             addrAndPrefDist.insert(std::make_pair(addr, pref_dist));
+            llvm::outs()<<"###### "<<addr<<", "<<pref_dist<<"\n";
          }
          locations.insert(std::make_pair(words[0], addrAndPrefDist));
          llvm::outs() << line << "\n"; 
